@@ -506,7 +506,11 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
         .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,  
         .dpi_clock_freq_mhz = 30,                     
         .virtual_channel = 0,                         
-        .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,                    
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+        .in_color_format = LCD_COLOR_FMT_RGB565,
+#else
+        .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,
+#endif
         .num_fbs = 1,                                 
         .video_timing = {                             
             .h_size = 480,                            
@@ -518,7 +522,9 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
             .vsync_pulse_width = 8,                   
             .vsync_front_porch = 60,                  
         },                                            
-        .flags.use_dma2d = true,                      
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
+        .flags.use_dma2d = true,
+#endif
     };
     dpi_config.num_fbs = CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
 
