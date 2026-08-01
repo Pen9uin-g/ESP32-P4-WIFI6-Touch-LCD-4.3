@@ -37,6 +37,47 @@ dependencies:
     public: true
 
   # AI Framework - Agent
-
-  # AI framework dependencies are omitted because
-  # CONFIG_ESP_BROOKESIA_ENABLE_AI_FRAMEWORK is disabled.
+  # Keep these dependencies out of the default IDF 6 build, where the
+  # example disables the AI framework. They remain available when the
+  # framework is explicitly enabled.
+  espressif/esp_coze:
+    version: '^0.6'
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/gmf_core:
+    version: "^0.6"
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/gmf_ai_audio:
+    version: '^0.6'
+    public: true
+    rules:
+      - if: "target in [esp32p4, esp32s3, esp32]"
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/gmf_io:
+    version: "^0.6"
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/gmf_misc:
+    version: "^0.6"
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/gmf_audio:
+    version: "^0.6"
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/esp_audio_simple_player:
+    version: '0.9.3'
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"
+  espressif/esp_websocket_client:
+    version: "^1.2.3"
+    public: true
+    rules:
+      - if: "idf_version < 6.0 || $CONFIG{ESP_BROOKESIA_ENABLE_AI_FRAMEWORK} == True"

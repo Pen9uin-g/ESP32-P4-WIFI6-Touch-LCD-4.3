@@ -48,12 +48,14 @@ jobs:
       - name: Discover changed ESP-IDF examples
         id: examples
         shell: bash
+        env:
+          PROJECT_INPUT: ${{ inputs.project }}
         run: |
           set -euo pipefail
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             python .github/scripts/discover_esp_idf_examples.py \
-              --example "${{ inputs.project }}"
+              --example "$PROJECT_INPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             python .github/scripts/discover_esp_idf_examples.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
