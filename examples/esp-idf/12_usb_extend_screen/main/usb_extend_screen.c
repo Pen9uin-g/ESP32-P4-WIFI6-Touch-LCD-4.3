@@ -26,5 +26,4 @@ void app_main(void)
 #if CONFIG_HID_TOUCH_ENABLE
     app_touch_init();
 #endif
-    app_uac_init();
 }

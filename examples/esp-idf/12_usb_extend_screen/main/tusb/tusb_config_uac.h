@@ -13,7 +13,7 @@ extern "C" {
 
 //------------- CLASS -------------//
 // The number of audio interfaces
-#define CFG_TUD_AUDIO             1
+#define CFG_TUD_AUDIO             CONFIG_UAC_AUDIO_ENABLE
 
 //--------------------------------------------------------------------
 // AUDIO CLASS DRIVER CONFIGURATION

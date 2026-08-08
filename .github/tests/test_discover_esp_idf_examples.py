@@ -92,11 +92,17 @@ class DiscoveryTests(unittest.TestCase):
             )
         ]
         matrix = discover.build_matrix(examples)["include"]
-        self.assertEqual(len(matrix), 40)
+        self.assertEqual(len(matrix), 39)
         self.assertEqual(sum(item["variant"] == "default" for item in matrix), 24)
         self.assertEqual(sum(item["variant"] == "rgb888" for item in matrix), 12)
-        self.assertEqual(sum(item["variant"] == "ai" for item in matrix), 2)
+        self.assertEqual(sum(item["variant"] == "ai" for item in matrix), 1)
         self.assertEqual(sum(item["variant"] == "minimal" for item in matrix), 2)
+        self.assertFalse(
+            any(
+                item["variant"] == "ai" and item["idf_version"] == "v6.0.2"
+                for item in matrix
+            )
+        )
 
 
 if __name__ == "__main__":

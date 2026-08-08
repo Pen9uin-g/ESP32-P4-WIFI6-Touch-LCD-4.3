@@ -14,6 +14,15 @@
 | `10_mp4_player/components/esp_extractor` | 预编译供应方组件 | 播放器依赖按目标区分的静态库；仓库中没有其源码及完整来源信息 |
 | `idf_component.yml` 声明的依赖 | 托管依赖 | Actions 从 ESP Component Registry 解析；生成的 `managed_components/` 目录不是仓库源码 |
 
+示例 10 将 `espressif/esp_audio_codec` 约束为 2.3 及以上、但低于 2.6 的版本。
+2.6 及以上版本要求 ESP32-P4 芯片 revision 3.0，而本产品仓库内的默认配置有意支持
+更早的 P4 revision。在产品支持的最低硬件版本改变前应保留该上界。
+
+示例 11 的 Brookesia AI 路径只在 ESP-IDF `v5.5.4` 下编译。当前 GMF 0.6 依赖集
+使用的构建系统行为与 ESP-IDF 6 组件需求扫描不兼容。在能够整体升级并验证这组 API
+相互耦合的 GMF 依赖前，应在 IDF 6 下保持关闭 AI；目前没有证据表明只替换 `gmf_io`
+是安全迁移。
+
 目前尚未确认组件注册表中与本地 4.3 英寸 BSP 快照等价的精确产物。未来迁移必须锁定
 候选版本、比较公开头文件和 Kconfig、保持本板 480 × 800 ST7701/GT911/音频/SDIO
 行为，并在删除本地副本前通过完整 Actions 矩阵。

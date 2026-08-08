@@ -205,13 +205,13 @@ def discover_changed_route(base_ref: str | None, head_ref: str, known_examples: 
     return classify_paths(paths_from_name_status(run_git(diff_args)), known_examples)
 
 
-def variants_for_example(example: str) -> tuple[tuple[str, str], ...]:
+def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str], ...]:
     name = PurePosixPath(example).name
     variants: list[tuple[str, str]] = [("default", "")]
     if name in RGB888_EXAMPLES:
         overlay = "usb_rgb888.defaults" if name == "12_usb_extend_screen" else "rgb888.defaults"
         variants.append(("rgb888", f"../../../config/ci/{overlay}"))
-    if name == "11_esp_brookesia_phone":
+    if name == "11_esp_brookesia_phone" and idf_version == "v5.5.4":
         variants.append(("ai", "../../../config/ci/brookesia_ai.defaults"))
     if name == "12_usb_extend_screen":
         variants.append(("minimal", "../../../config/ci/usb_minimal.defaults"))
@@ -222,7 +222,7 @@ def build_matrix(selected: list[str] | tuple[str, ...]) -> dict[str, list[dict[s
     include: list[dict[str, str]] = []
     for example in selected:
         for idf_version in DEFAULT_IDF_VERSIONS:
-            for variant, sdkconfig_defaults in variants_for_example(example):
+            for variant, sdkconfig_defaults in variants_for_example(example, idf_version):
                 include.append(
                     {
                         "example": example,

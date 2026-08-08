@@ -154,11 +154,40 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         if required not in player_source:
             errors.append(f"10_mp4_player: missing conditional display path {required}")
 
+    player_manifest = (
+        repo_root / "examples" / "esp-idf" / "10_mp4_player" / "main" / "idf_component.yml"
+    ).read_text(encoding="utf-8")
+    if 'version: ">=2.3.0,<2.6.0"' not in player_manifest:
+        errors.append(
+            "10_mp4_player: esp_audio_codec must stay below v2.6 for pre-revision-3 P4 hardware"
+        )
+
     usb_cmake = (
         repo_root / "examples" / "esp-idf" / "12_usb_extend_screen" / "main" / "CMakeLists.txt"
     ).read_text(encoding="utf-8")
     if usb_cmake.count('"app_uac.c"') != 1:
         errors.append("12_usb_extend_screen: app_uac.c must appear once in its conditional source list")
+    usb_tinyusb_config = (
+        repo_root
+        / "examples"
+        / "esp-idf"
+        / "12_usb_extend_screen"
+        / "main"
+        / "tusb"
+        / "tusb_config_uac.h"
+    ).read_text(encoding="utf-8")
+    if "#define CFG_TUD_AUDIO             CONFIG_UAC_AUDIO_ENABLE" not in usb_tinyusb_config:
+        errors.append("12_usb_extend_screen: TinyUSB audio class must follow UAC_AUDIO_ENABLE")
+    usb_main = (
+        repo_root
+        / "examples"
+        / "esp-idf"
+        / "12_usb_extend_screen"
+        / "main"
+        / "usb_extend_screen.c"
+    ).read_text(encoding="utf-8")
+    if "app_uac_init" in usb_main:
+        errors.append("12_usb_extend_screen: UAC initialization must be owned by app_usb only")
 
     firmware = sorted((repo_root / "firmware").glob("*.bin"))
     if len(firmware) != 1:

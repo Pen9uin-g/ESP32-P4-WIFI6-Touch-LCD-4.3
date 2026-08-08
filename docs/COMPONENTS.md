@@ -15,6 +15,17 @@ sources, managed dependencies, and one prebuilt component. Treating every
 | `10_mp4_player/components/esp_extractor` | Prebuilt vendor component | Target-specific static libraries are required by the player; source and complete provenance are not present here |
 | Dependencies declared in `idf_component.yml` | Managed dependency | Actions resolves them from the ESP Component Registry; generated `managed_components/` trees are not repository source |
 
+Example 10 constrains `espressif/esp_audio_codec` to versions from 2.3 up to,
+but not including, 2.6. Version 2.6 and newer require ESP32-P4 silicon revision
+3.0, while this product's checked-in defaults intentionally support earlier P4
+revisions. Keep this upper bound until the supported hardware floor changes.
+
+Example 11's Brookesia AI path is compiled only with ESP-IDF `v5.5.4`. Its
+current GMF 0.6 dependency set uses build-system behavior that is incompatible
+with the ESP-IDF 6 component-requirements pass. Keep AI disabled on IDF 6 until
+the complete, API-coupled GMF dependency set can be upgraded and validated
+together; replacing only `gmf_io` is not an established-safe migration.
+
 The exact registry artifact corresponding to the local 4.3-inch BSP has not
 been established as equivalent to this snapshot. A future migration must pin a
 candidate, compare public headers and Kconfig, preserve the board's 480 × 800

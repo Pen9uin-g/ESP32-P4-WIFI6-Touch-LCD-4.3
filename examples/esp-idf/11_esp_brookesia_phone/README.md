@@ -16,8 +16,10 @@ is not part of this example's build procedure.
 The checked-in `sdkconfig.defaults` selects ESP32-P4, 32 MB QIO flash, PSRAM at
 200 MHz, and three display buffers. To keep the default footprint bounded, it
 disables the Brookesia AI framework, animation player, services, speaker system,
-and unused Boost libraries. Actions also compiles an explicit AI-enabled lane so
-that its conditional dependency path does not silently regress.
+and unused Boost libraries. Actions also compiles an explicit AI-enabled lane
+with ESP-IDF `v5.5.4` so that its conditional dependency path does not silently
+regress. The current GMF 0.6 dependency set is not compatible with the ESP-IDF 6
+component-requirements pass, so the IDF 6 lane keeps AI disabled.
 
 ESP-Brookesia in this repository is a preview integration. Actions proves that
 the code compiles with ESP-IDF `v5.5.4` and `v6.0.2`; layout, touch behavior,
