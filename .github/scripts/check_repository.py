@@ -176,7 +176,12 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         / "tusb"
         / "tusb_config_uac.h"
     ).read_text(encoding="utf-8")
-    if "#define CFG_TUD_AUDIO             CONFIG_UAC_AUDIO_ENABLE" not in usb_tinyusb_config:
+    audio_guard = (
+        "#if CONFIG_UAC_AUDIO_ENABLE",
+        "#define CFG_TUD_AUDIO             1",
+        "#define CFG_TUD_AUDIO             0",
+    )
+    if not all(required in usb_tinyusb_config for required in audio_guard):
         errors.append("12_usb_extend_screen: TinyUSB audio class must follow UAC_AUDIO_ENABLE")
     usb_main = (
         repo_root
