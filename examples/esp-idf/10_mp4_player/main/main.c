@@ -20,7 +20,15 @@
 
 static const char *TAG = "main";
 
-#define DISPLAY_BUFFER_SIZE (BSP_LCD_H_RES * BSP_LCD_V_RES * 2)
+#if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
+#define DISPLAY_BYTES_PER_PIXEL 3
+#define DISPLAY_JPEG_CONFIG_DEFAULT() APP_STREAM_JPEG_CONFIG_DEFAULT_RGB888()
+#else
+#define DISPLAY_BYTES_PER_PIXEL 2
+#define DISPLAY_JPEG_CONFIG_DEFAULT() APP_STREAM_JPEG_CONFIG_DEFAULT_RGB565()
+#endif
+
+#define DISPLAY_BUFFER_SIZE (BSP_LCD_H_RES * BSP_LCD_V_RES * DISPLAY_BYTES_PER_PIXEL)
 
 #define MP4_FILENAME   BSP_SD_MOUNT_POINT "/" CONFIG_MP4_FILENAME
 
@@ -58,7 +66,7 @@ static esp_err_t display_decoded_frame(uint8_t *buffer, uint32_t buffer_size,
 
 void app_main()
 {
-    ESP_LOGI(TAG, "Starting HDMI MP4 Player application");
+    ESP_LOGI(TAG, "Starting onboard LCD media player application");
 
     // Initialize display
     esp_err_t ret = bsp_display_new(NULL, &lcd_panel, &lcd_io);
@@ -109,7 +117,7 @@ void app_main()
         .buffer_count = CONFIG_BSP_LCD_DPI_BUFFER_NUMS,
         .buffer_size = DISPLAY_BUFFER_SIZE,
         .audio_dev = audio_dev,
-        .jpeg_config = APP_STREAM_JPEG_CONFIG_DEFAULT_RGB565()
+        .jpeg_config = DISPLAY_JPEG_CONFIG_DEFAULT()
     };
 
     ret = app_stream_adapter_init(&adapter_config, &stream_adapter);

@@ -2,91 +2,107 @@ name: ESP-IDF examples
 
 on:
   pull_request:
-    paths:
-      - "examples/**"
-      - "firmware/**"
-      - "Firmware/**"
-      - "FirmWare/**"
-      - "config/**"
-      - ".github/workflows/esp-idf-examples.yml"
-      - ".github/scripts/discover_esp_idf_examples.py"
   push:
     branches:
       - main
-    paths:
-      - "examples/**"
-      - "firmware/**"
-      - "Firmware/**"
-      - "FirmWare/**"
-      - "config/**"
-      - ".github/workflows/esp-idf-examples.yml"
-      - ".github/scripts/discover_esp_idf_examples.py"
   workflow_dispatch:
     inputs:
       project:
-        description: "ESP-IDF example or firmware project directory name, path, or all"
+        description: "Direct ESP-IDF example directory name, path, or all"
         required: false
         default: "all"
 
 permissions:
   contents: read
 
+concurrency:
+  group: esp-idf-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   discover:
-    name: Discover examples
+    name: Preflight and route changes
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.examples.outputs.matrix }}
       has_examples: ${{ steps.examples.outputs.has_examples }}
       examples: ${{ steps.examples.outputs.examples }}
+      route: ${{ steps.examples.outputs.route }}
+      docs_only: ${{ steps.examples.outputs.docs_only }}
+      firmware_changes: ${{ steps.examples.outputs.firmware_changes }}
+      release_review: ${{ steps.examples.outputs.release_review }}
+      unknown_paths: ${{ steps.examples.outputs.unknown_paths }}
+      build_count: ${{ steps.examples.outputs.build_count }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Discover changed ESP-IDF examples
+      - name: Test repository CI helpers
+        run: python .github/tests/run_tests.py
+
+      - name: Audit repository metadata and local links
+        run: python .github/scripts/check_repository.py
+
+      - name: Route changed ESP-IDF examples
         id: examples
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
           PROJECT_INPUT: ${{ inputs.project }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             python .github/scripts/discover_esp_idf_examples.py \
               --example "$PROJECT_INPUT"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
             python .github/scripts/discover_esp_idf_examples.py \
-              --base-ref "${{ github.event.pull_request.base.sha }}" \
-              --head-ref "${{ github.sha }}" \
-              --fallback-all
+              --base-ref "$PR_BASE_SHA" \
+              --head-ref "$PR_HEAD_SHA"
           else
-            before="${{ github.event.before }}"
+            before="$PUSH_BEFORE_SHA"
             if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
               before=""
             fi
             python .github/scripts/discover_esp_idf_examples.py \
               --base-ref "$before" \
-              --head-ref "${{ github.sha }}" \
-              --fallback-all
+              --head-ref "$PUSH_HEAD_SHA"
           fi
 
       - name: Summary
+        env:
+          BUILD_COUNT: ${{ steps.examples.outputs.build_count }}
+          EXAMPLES: ${{ steps.examples.outputs.examples }}
+          FIRMWARE_CHANGES: ${{ steps.examples.outputs.firmware_changes }}
+          ROUTE: ${{ steps.examples.outputs.route }}
+          UNKNOWN_PATHS: ${{ steps.examples.outputs.unknown_paths }}
         shell: bash
         run: |
-          if [[ "${{ steps.examples.outputs.has_examples }}" == "true" ]]; then
-            {
-              echo "### ESP-IDF examples selected"
-              echo
-              echo '${{ steps.examples.outputs.examples }}' | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No ESP-IDF example changes detected." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          {
+            echo "### ESP-IDF CI route"
+            echo
+            echo "- Route: \`$ROUTE\`"
+            echo "- Build jobs: $BUILD_COUNT"
+            if [[ -n "$EXAMPLES" ]]; then
+              echo "- Selected examples:"
+              echo "$EXAMPLES" | tr ',' '\n' | sed '/^$/d' | sed 's/^/  - /'
+            fi
+            if [[ "$FIRMWARE_CHANGES" == "true" ]]; then
+              echo "- Factory firmware changed: release-owner review is required; binaries are not rebuilt here."
+            fi
+            if [[ -n "$UNKNOWN_PATHS" ]]; then
+              echo "- Unknown paths forced the conservative full matrix: \`$UNKNOWN_PATHS\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build ${{ matrix.example }} (${{ matrix.idf_version }})
+    name: Build ${{ matrix.example }} (${{ matrix.idf_version }}, ${{ matrix.variant }})
     needs: discover
     if: needs.discover.outputs.has_examples == 'true'
     runs-on: ubuntu-latest
@@ -97,9 +113,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build with ESP-IDF
+      - name: Build default configuration
+        if: matrix.sdkconfig_defaults == ''
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: ${{ matrix.idf_version }}
           target: esp32p4
           path: ${{ matrix.example }}
+
+      - name: Build ${{ matrix.variant }} configuration
+        if: matrix.sdkconfig_defaults != ''
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf_version }}
+          target: esp32p4
+          path: ${{ matrix.example }}
+          command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;${{ matrix.sdkconfig_defaults }}" build

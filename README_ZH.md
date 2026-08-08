@@ -10,7 +10,8 @@
     <a href="https://www.waveshare.net/shop/ESP32-P4-WIFI6-Touch-LCD-4.3.htm">🌐 产品页面</a> ·
     <a href="https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/">📚 产品文档</a> ·
     <a href="firmware/">📦 出厂固件</a> ·
-    <a href="examples/esp-idf/">🧩 ESP-IDF 示例</a>
+    <a href="examples/esp-idf/">🧩 ESP-IDF 示例</a> ·
+    <a href="docs/README_ZH.md">📖 仓库指南</a>
   </p>
   <img src="assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3" width="600">
 </div>
@@ -77,15 +78,17 @@ ESP-IDF 示例固件。
 
 ## 🛠️ 持续集成
 
-| 开发框架 | 版本 | 工程数 |
-| --- | --- | ---: |
-| ESP-IDF | `v5.5.4` | 12 |
-| ESP-IDF | `v6.0.2` | 12 |
+| 开发框架 | 版本 | 默认构建 | 条件配置构建 |
+| --- | --- | ---: | ---: |
+| ESP-IDF | `v5.5.4` | 12 | 8 |
+| ESP-IDF | `v6.0.2` | 12 | 8 |
 
 [ESP-IDF 示例工作流](.github/workflows/esp-idf-examples.yml)会发现
-`examples/esp-idf/` 下的第一方工程。完整运行包含 1 个发现任务和 24 个构建任务；
-手动触发时可输入 `all`、示例目录名或示例路径。该工作流只提供编译验证，不上传
-可直接烧录的固件包。
+`examples/esp-idf/` 下 12 个直接第一方工程。完整源码运行包含 1 个预检任务和
+40 个构建任务：24 个默认配置，以及 RGB888、Brookesia AI 与 USB 最小配置。
+仅文档修改只运行预检；出厂固件修改会提示发布审核，但不会作为示例源码处理。未知路径
+会触发完整矩阵，差异为空或无法读取时则直接失败。路由与证据边界详见
+[CI 指南](docs/CI_ZH.md)。
 
 ## 🗂️ 仓库结构
 
@@ -95,6 +98,8 @@ ESP-IDF 示例固件。
 | [`firmware/`](firmware/) | 仓库内提供的出厂及恢复镜像 |
 | [`schematic/`](schematic/) | 产品原理图 |
 | [`assets/`](assets/) | 文档使用的产品图片 |
+| [`config/ci/`](config/ci/) | 仅供 Actions 使用的条件 sdkconfig 覆盖配置 |
+| [`docs/`](docs/) | 仓库 CI、组件和硬件维护指南 |
 | [`.github/`](.github/) | CI 工作流及示例发现逻辑 |
 
 ## 📚 文档
@@ -103,13 +108,20 @@ ESP-IDF 示例固件。
 - [English Product Documentation](https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-4.3)
 - [产品原理图](schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf)
 - [ESP-IDF 示例](examples/esp-idf/)
+- [仓库指南](docs/README_ZH.md)
+- [持续集成](docs/CI_ZH.md)
+- [组件边界](docs/COMPONENTS_ZH.md)
+- [硬件审计](docs/HARDWARE_ZH.md)
 - [English README](README.md)
 
 ## 🤝 支持与贡献
 
 欢迎提交贡献和可复现的问题报告。请提供产品及硬件版本、示例路径、ESP-IDF 版本、
-复现步骤、预期行为、实际行为以及相关构建或串口日志。
+复现步骤、预期行为、实际行为以及相关构建或串口日志。修改本地组件或出厂固件前请先
+检查仓库边界。
 
+- [贡献指南](CONTRIBUTING_ZH.md)
+- [支持策略](SUPPORT_ZH.md)
 - [提交 Issue](https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-4.3/issues)
 - [微雪技术支持](https://www.waveshare.net/help_center/contact.htm)
 

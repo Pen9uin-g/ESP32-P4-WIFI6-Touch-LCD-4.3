@@ -1,0 +1,65 @@
+{
+  "classification_rules": [
+    {
+      "category": "third_party",
+      "patterns": [
+        "examples/esp-idf/10_mp4_player/components/esp_extractor/**"
+      ]
+    },
+    {
+      "category": "first_party_customer",
+      "patterns": [
+        "examples/esp-idf/09_video_lcd_display/README*.md",
+        "examples/esp-idf/10_mp4_player/README*.md",
+        "examples/esp-idf/11_esp_brookesia_phone/README*.md"
+      ]
+    },
+    {
+      "category": "first_party_maintainer",
+      "patterns": [
+        "docs/**"
+      ]
+    }
+  ],
+  "bilingual_pairs": [
+    {
+      "english": "CONTRIBUTING.md",
+      "chinese": "CONTRIBUTING_ZH.md"
+    },
+    {
+      "english": "SUPPORT.md",
+      "chinese": "SUPPORT_ZH.md"
+    },
+    {
+      "english": "docs/README.md",
+      "chinese": "docs/README_ZH.md"
+    },
+    {
+      "english": "docs/CI.md",
+      "chinese": "docs/CI_ZH.md"
+    },
+    {
+      "english": "docs/COMPONENTS.md",
+      "chinese": "docs/COMPONENTS_ZH.md"
+    },
+    {
+      "english": "docs/HARDWARE.md",
+      "chinese": "docs/HARDWARE_ZH.md"
+    },
+    {
+      "english": "examples/esp-idf/09_video_lcd_display/README.md",
+      "chinese": "examples/esp-idf/09_video_lcd_display/README_ZH.md"
+    },
+    {
+      "english": "examples/esp-idf/10_mp4_player/README.md",
+      "chinese": "examples/esp-idf/10_mp4_player/README_ZH.md"
+    },
+    {
+      "english": "examples/esp-idf/11_esp_brookesia_phone/README.md",
+      "chinese": "examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"
+    }
+  ],
+  "pair_exempt_patterns": [
+    ".github/pull_request_template.md"
+  ]
+}

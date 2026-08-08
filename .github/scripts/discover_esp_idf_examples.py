@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Discover ESP-IDF examples that should be built by CI."""
+"""Route repository changes to the ESP-IDF build matrix.
+
+Only direct children of ``examples/esp-idf`` are product examples. Nested
+projects belong to vendored components or their test suites and are not
+promoted to product CI jobs.
+"""
 
 from __future__ import annotations
 
@@ -9,18 +14,54 @@ import json
 import os
 import subprocess
 import sys
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 
-GLOBAL_EXAMPLE_PATTERNS = (
-    ".github/workflows/esp-idf-examples.yml",
-    ".github/workflows/esp-idf-projects.yml",
-    ".github/scripts/discover_esp_idf_examples.py",
-    ".github/scripts/discover_esp_idf_projects.py",
-    "config/*.defaults",
-    "config/**/*.defaults",
-)
+EXAMPLES_ROOT = PurePosixPath("examples/esp-idf")
 DEFAULT_IDF_VERSIONS = ("v5.5.4", "v6.0.2")
+GLOBAL_BUILD_PATTERNS = (
+    ".github/workflows/esp-idf-examples.yml",
+    ".github/scripts/discover_esp_idf_examples.py",
+    ".github/scripts/check_repository.py",
+    ".github/tests/**",
+    "config/ci/**",
+)
+DOCUMENTATION_PATTERNS = (
+    "*.md",
+    "docs/**",
+    "assets/**",
+    "schematic/**",
+    ".github/ISSUE_TEMPLATE/**",
+    ".github/pull_request_template.md",
+    ".github/markdown-audit.json",
+)
+FIRMWARE_PATTERNS = ("firmware/**", "Firmware/**", "FirmWare/**")
+
+# Extra lanes are intentionally small and target conditional code that the
+# default sdkconfig does not compile. Paths are relative to each example.
+RGB888_EXAMPLES = {
+    "07_Displaycolorbar",
+    "08_lvgl_demo_v9",
+    "09_video_lcd_display",
+    "10_mp4_player",
+    "11_esp_brookesia_phone",
+    "12_usb_extend_screen",
+}
+
+
+class RoutingError(RuntimeError):
+    """The changed-file scope cannot be determined safely."""
+
+
+@dataclass(frozen=True)
+class Route:
+    selected: tuple[str, ...]
+    kind: str
+    docs_only: bool = False
+    firmware_changes: bool = False
+    release_review: bool = False
+    unknown_paths: tuple[str, ...] = ()
 
 
 def run_git(args: list[str]) -> list[str]:
@@ -30,37 +71,28 @@ def run_git(args: list[str]) -> list[str]:
         text=True,
         stdout=subprocess.PIPE,
     )
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return [line.rstrip("\n") for line in result.stdout.splitlines() if line.strip()]
 
 
 def is_project(path: Path) -> bool:
     return (path / "CMakeLists.txt").is_file() and (path / "main").is_dir()
 
 
-def discover_roots() -> list[Path]:
-    roots: list[Path] = []
-    examples = Path("examples")
-    if examples.is_dir():
-        for path in examples.iterdir():
-            if path.is_dir() and path.name.lower().replace("_", "-").startswith("esp-idf"):
-                roots.append(path)
+def list_examples(repo_root: Path = Path(".")) -> list[str]:
+    root = repo_root / EXAMPLES_ROOT
+    if not root.is_dir():
+        return []
 
-    for firmware_root in (Path("firmware"), Path("Firmware"), Path("FirmWare")):
-        if firmware_root.is_dir():
-            roots.append(firmware_root)
-
-    return sorted(dict.fromkeys(roots), key=lambda item: item.as_posix().lower())
+    examples = [
+        (EXAMPLES_ROOT / path.name).as_posix()
+        for path in root.iterdir()
+        if path.is_dir() and is_project(path)
+    ]
+    return sorted(examples)
 
 
-def list_examples() -> list[str]:
-    examples: list[str] = []
-    for root in discover_roots():
-        if is_project(root):
-            examples.append(root.as_posix())
-        for path in root.iterdir():
-            if path.is_dir() and is_project(path):
-                examples.append(path.as_posix())
-    return sorted(dict.fromkeys(examples))
+def normalize_path(value: str) -> str:
+    return PurePosixPath(value.strip().replace("\\", "/").strip("/")).as_posix()
 
 
 def normalize_example(value: str, known_examples: set[str]) -> str:
@@ -68,48 +100,138 @@ def normalize_example(value: str, known_examples: set[str]) -> str:
     if not value or value == "all":
         return value
 
-    normalized = Path(value).as_posix()
+    normalized = normalize_path(value)
     if normalized in known_examples:
         return normalized
 
-    matches = [example for example in known_examples if Path(example).name == value]
+    matches = [example for example in known_examples if PurePosixPath(example).name == value]
     if len(matches) == 1:
         return matches[0]
 
     return normalized
 
 
-def discover_from_paths(paths: list[str], known_examples: set[str]) -> list[str]:
+def matches_any(path: str, patterns: tuple[str, ...]) -> bool:
+    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
+
+
+def paths_from_name_status(lines: list[str]) -> list[str]:
+    """Expand git --name-status output, retaining both sides of renames."""
+    paths: list[str] = []
+    for line in lines:
+        fields = line.split("\t")
+        if len(fields) < 2:
+            raise RoutingError(f"Malformed git diff record: {line!r}")
+        status = fields[0]
+        record_paths = fields[1:]
+        if status.startswith(("R", "C")):
+            if len(record_paths) != 2:
+                raise RoutingError(f"Malformed rename/copy record: {line!r}")
+        elif len(record_paths) != 1:
+            raise RoutingError(f"Malformed git diff record: {line!r}")
+        paths.extend(normalize_path(path) for path in record_paths)
+    return sorted(dict.fromkeys(paths))
+
+
+def example_for_path(path: str, known_examples: set[str]) -> str | None:
+    for example in sorted(known_examples):
+        if path == example or path.startswith(example + "/"):
+            return example
+    return None
+
+
+def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
+    if not paths:
+        raise RoutingError("Git diff produced no changed paths; refusing to guess a build scope.")
+
     selected: set[str] = set()
-    roots = discover_roots()
+    unknown: set[str] = set()
+    docs = False
+    firmware = False
+    global_build = False
 
-    for changed_path in paths:
-        changed_path = changed_path.strip().strip("/")
-        if any(fnmatch.fnmatch(changed_path, pattern) for pattern in GLOBAL_EXAMPLE_PATTERNS):
-            selected.update(known_examples)
-            continue
-
-        for example in known_examples:
-            if changed_path == example or changed_path.startswith(example + "/"):
-                selected.add(example)
-                break
+    for raw_path in paths:
+        path = normalize_path(raw_path)
+        example = example_for_path(path, known_examples)
+        if example:
+            selected.add(example)
+        elif matches_any(path, GLOBAL_BUILD_PATTERNS):
+            global_build = True
+        elif matches_any(path, FIRMWARE_PATTERNS):
+            firmware = True
+        elif matches_any(path, DOCUMENTATION_PATTERNS):
+            docs = True
         else:
-            for root in roots:
-                root_path = root.as_posix()
-                if changed_path == root_path or changed_path.startswith(root_path + "/"):
-                    selected.update(known_examples)
-                    break
+            unknown.add(path)
 
-    return sorted(selected)
+    if global_build or unknown:
+        selected = set(known_examples)
 
-
-def discover_changed_examples(base_ref: str | None, head_ref: str, known_examples: set[str]) -> list[str]:
-    if base_ref:
-        diff_args = ["diff", "--name-only", f"{base_ref}...{head_ref}"]
+    if unknown:
+        kind = "unknown"
+    elif global_build:
+        kind = "global"
+    elif selected:
+        kind = "examples"
+    elif firmware:
+        kind = "firmware"
     else:
-        diff_args = ["diff-tree", "--no-commit-id", "--name-only", "-r", head_ref]
+        kind = "docs"
 
-    return discover_from_paths(run_git(diff_args), known_examples)
+    docs_only = docs and not selected and not firmware and not unknown and not global_build
+    return Route(
+        selected=tuple(sorted(selected)),
+        kind=kind,
+        docs_only=docs_only,
+        firmware_changes=firmware,
+        release_review=firmware,
+        unknown_paths=tuple(sorted(unknown)),
+    )
+
+
+def discover_changed_route(base_ref: str | None, head_ref: str, known_examples: set[str]) -> Route:
+    if base_ref:
+        diff_args = ["diff", "--name-status", "--find-renames", f"{base_ref}...{head_ref}"]
+    else:
+        diff_args = [
+            "diff-tree",
+            "--root",
+            "--no-commit-id",
+            "--name-status",
+            "--find-renames",
+            "-r",
+            head_ref,
+        ]
+    return classify_paths(paths_from_name_status(run_git(diff_args)), known_examples)
+
+
+def variants_for_example(example: str) -> tuple[tuple[str, str], ...]:
+    name = PurePosixPath(example).name
+    variants: list[tuple[str, str]] = [("default", "")]
+    if name in RGB888_EXAMPLES:
+        overlay = "usb_rgb888.defaults" if name == "12_usb_extend_screen" else "rgb888.defaults"
+        variants.append(("rgb888", f"../../../config/ci/{overlay}"))
+    if name == "11_esp_brookesia_phone":
+        variants.append(("ai", "../../../config/ci/brookesia_ai.defaults"))
+    if name == "12_usb_extend_screen":
+        variants.append(("minimal", "../../../config/ci/usb_minimal.defaults"))
+    return tuple(variants)
+
+
+def build_matrix(selected: list[str] | tuple[str, ...]) -> dict[str, list[dict[str, str]]]:
+    include: list[dict[str, str]] = []
+    for example in selected:
+        for idf_version in DEFAULT_IDF_VERSIONS:
+            for variant, sdkconfig_defaults in variants_for_example(example):
+                include.append(
+                    {
+                        "example": example,
+                        "idf_version": idf_version,
+                        "variant": variant,
+                        "sdkconfig_defaults": sdkconfig_defaults,
+                    }
+                )
+    return {"include": include}
 
 
 def github_output(name: str, value: str) -> None:
@@ -119,18 +241,22 @@ def github_output(name: str, value: str) -> None:
             output.write(f"{name}={value}\n")
 
 
-def versions_for_example(example: str) -> tuple[str, ...]:
-    return DEFAULT_IDF_VERSIONS
-
-
-def build_matrix(selected: list[str]) -> dict[str, list[dict[str, str]]]:
-    return {
-        "include": [
-            {"example": example, "idf_version": idf_version}
-            for example in selected
-            for idf_version in versions_for_example(example)
-        ]
+def emit(route: Route) -> None:
+    matrix = build_matrix(route.selected)
+    values = {
+        "matrix": json.dumps(matrix, separators=(",", ":")),
+        "has_examples": "true" if route.selected else "false",
+        "examples": ",".join(route.selected),
+        "route": route.kind,
+        "docs_only": str(route.docs_only).lower(),
+        "firmware_changes": str(route.firmware_changes).lower(),
+        "release_review": str(route.release_review).lower(),
+        "unknown_paths": ",".join(route.unknown_paths),
+        "build_count": str(len(matrix["include"])),
     }
+    for name, value in values.items():
+        github_output(name, value)
+    print(values["matrix"])
 
 
 def main() -> int:
@@ -138,40 +264,32 @@ def main() -> int:
     parser.add_argument("--base-ref")
     parser.add_argument("--head-ref", default="HEAD")
     parser.add_argument("--example", default="")
-    parser.add_argument(
-        "--fallback-all",
-        action="store_true",
-        help="Build all examples when no changed example is detected.",
-    )
     args = parser.parse_args()
 
     known_examples = set(list_examples())
+    if not known_examples:
+        print("No direct ESP-IDF product examples were found.", file=sys.stderr)
+        return 1
+
     requested_example = normalize_example(args.example, known_examples)
+    try:
+        if requested_example == "all":
+            route = Route(tuple(sorted(known_examples)), "manual")
+        elif requested_example:
+            if requested_example not in known_examples:
+                print(f"Unknown ESP-IDF example: {args.example}", file=sys.stderr)
+                print("Known examples:", file=sys.stderr)
+                for example in sorted(known_examples):
+                    print(f"  {example}", file=sys.stderr)
+                return 1
+            route = Route((requested_example,), "manual")
+        else:
+            route = discover_changed_route(args.base_ref, args.head_ref, known_examples)
+    except (RoutingError, subprocess.CalledProcessError) as error:
+        print(f"Unable to determine a safe CI route: {error}", file=sys.stderr)
+        return 1
 
-    if requested_example == "all":
-        selected = sorted(known_examples)
-    elif requested_example:
-        if requested_example not in known_examples:
-            print(f"Unknown ESP-IDF example: {args.example}", file=sys.stderr)
-            print("Known examples:", file=sys.stderr)
-            for example in sorted(known_examples):
-                print(f"  {example}", file=sys.stderr)
-            return 1
-        selected = [requested_example]
-    else:
-        selected = discover_changed_examples(args.base_ref, args.head_ref, known_examples)
-        if args.fallback_all and not selected:
-            selected = sorted(known_examples)
-
-    matrix = build_matrix(selected)
-    matrix_json = json.dumps(matrix, separators=(",", ":"))
-    has_examples = "true" if selected else "false"
-
-    github_output("matrix", matrix_json)
-    github_output("has_examples", has_examples)
-    github_output("examples", ",".join(selected))
-
-    print(matrix_json)
+    emit(route)
     return 0
 
 

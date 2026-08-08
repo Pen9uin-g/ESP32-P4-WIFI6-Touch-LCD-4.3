@@ -1,157 +1,45 @@
-| Supported Targets | ESP32-P4 |
-| ----------------- | -------- |
+# MP4/AVI player on the onboard LCD
 
-# HDMI Video Renderer
+[中文](README_ZH.md)
 
-This example demonstrates how to display a video in MP4/AVI format on an HDMI monitor.
+This example reads a media file from the onboard MicroSD card, decodes it on
+ESP32-P4, renders video on the 4.3-inch 480 × 800 MIPI-DSI LCD, and sends audio
+to the board codec when an audio device is available. No HDMI bridge is used.
 
-## How to use the example
+## Supported media paths
 
-## ESP-IDF Required
+- MP4 and AVI container extractors are registered.
+- MJPEG is the supported video codec. H.264 and other video codecs are rejected
+  by the current compatibility check.
+- AAC and MP3 audio decoders are always registered.
+- FLAC, Opus, Vorbis, and ADPCM decoders can be enabled in `menuconfig`.
+- If audio-device initialization fails, the application continues with video
+  playback.
 
-### Hardware Required
+The default media path is `/sdcard/test_video.mp4`. The player restarts the file
+after playback ends. Use media whose dimensions and throughput fit the display
+and available PSRAM bandwidth; actual playback stability must be verified on
+the board.
 
-* An ESP32-P4-Function-EV-Board.
-* An [ESP-HDMI-Bridge](https://oshwhub.com/esp-college/esp-hdmi-bridge).
-* An SD card that stores MP4 videos.
-* A USB-C cable for power supply and programming.
-* Please refer to the following steps for the connection:
-    * **Step 1**. According to the table below, connect the pins on the back of the screen adapter board to the corresponding pins on the development board.
+## Prepare the MicroSD card
 
-        | ESP-HDMI-Bridge      | ESP32-P4-Function-EV-Board |
-        | -------------------- | -------------------------- |
-        | 5V (any one)         | 5V (any one)               |
-        | GND (any one)        | GND (any one)              |
+1. Format a card with a filesystem supported by the ESP-IDF FAT filesystem
+   component.
+2. Copy an MJPEG video to the card.
+3. Name it `test_video.mp4`, or change `Video File Name` in the
+   `MP4/AVI Player Configuration` menu.
+4. Insert the card before starting the application.
 
-    * **Step 2**. Connect the FPC of LCD through the `MIPI_DSI` interface.
-    * **Step 3**. Use a USB-C cable to connect the `USB-UART` port to a PC (Used for power supply and viewing serial output).
-    * **Step 4**. Turn on the power switch of the board.
+## Build, flash, and monitor
 
-### Configure the Project
+From this directory in an activated ESP-IDF environment:
 
-Run `idf.py menuconfig` and navigate to `HDMI MP4 Player Configuration` menu.
-
-- Navigate to `Video File Configuration` submenu
-- Set the `Video File Name` to match your video file name stored in the SD card
-- Default value is `test_video.mp4`
-- Make sure the file name matches exactly, including the `.mp4` or `.avi` extension
-
-### Test Video Downloads
-
-This repository provides a test MP4 file encoded with MJPEG video and AAC audio for testing and compatibility purposes.
-
-- **Video Codec**: MJPEG  
-- **Audio Codec**: AAC  
-- **Frame Rate**: 20fps(RGB888)
-- **File Format**: `.mp4`  
-- **Download Link**: [test_video.mp4](https://dl.espressif.com/AE/esp-dev-kits/test_video.mp4)
-
-This test file is useful for validating MJPEG decoding, AAC audio support, and embedded system playback compatibility.
-
-### Build and Flash
-
-Run `idf.py set-target esp32p4` to select the target chip.
-
-Run `idf.py -p PORT build flash monitor` to build, flash and monitor the project. A fancy animation will show up on the LCD as expected.
-
-The first time you run `idf.py` for the example will cost extra time as the build system needs to address the component dependencies and downloads the missing components from registry into `managed_components` folder.
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the [Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
-
-## Troubleshooting
-
-For any technical queries, please open an [issue](https://github.com/espressif/esp-iot-solution/issues) on GitHub. We will get back to you soon.
-
-## Important Notes
-
-### Video Format Requirements
-
-1. **MP4 Container Format**
-   - Currently only supports MP4 files with MJPEG video encoding
-   - Other video codecs (H.264, H.265, etc.) are not supported at this time
-   - Audio tracks in MP4 files are supported
-
-2. **Video Resolution and Format**
-   - For YUV420 format videos:
-     * Width must be divisible by 16
-     * Height must be divisible by 16
-     * This alignment requirement ensures optimal performance and compatibility
-   - For YUV422 format videos:
-     * Width must be divisible by 16
-     * Height must be divisible by 8
-     * Provides better color quality than YUV420 but requires more bandwidth
-   - For YUV444 format videos:
-     * Width must be divisible by 8
-     * Height must be divisible by 8
-     * Offers the highest color quality but requires the most bandwidth
-
-3. **Display Buffer Configuration**
-   - When using LCD internal buffer mode:
-     * Video resolution must exactly match the HDMI output resolution
-     * This ensures optimal performance and prevents display artifacts
-     * Example: If HDMI is set to 1280x720, the MP4 must also be 1280x720
-   - When using external buffer mode:
-     * More flexible resolution support
-     * Automatic scaling is available
-     * May have slightly lower performance compared to internal buffer mode
-
-### FAQ
-
-#### Blue Screen Flickering Issues
-
-If you encounter blue screen flickering during video playback, this is typically caused by **insufficient PSRAM bandwidth**. Here are the recommended solutions:
-
-1. **Use RGB565 Format**
-   - If your display supports RGB565, consider switching from RGB888 to RGB565 format
-
-2. **Optimize Video Parameters**
-   - **Lower Resolution**: Reduce video resolution (e.g., from 1280x720 to 1024x768)
-   - **Reduce Frame Rate**: Lower the video frame rate (e.g., from 30fps to 20fps or 15fps)
-   - **Increase Compression**: Use higher JPEG compression quality to reduce frame sizes
-
-3. **AVI Format Audio Limitations**
-   - **AVI videos with audio are not recommended** due to higher bandwidth requirements
-   - If playing AVI files causes blue screen flickering, **disable audio playback**
-   - For audio playback, use MP4 format with AAC encoding instead
-
-These optimizations help balance video quality with available system bandwidth to ensure stable playback.
-
-## Video Conversion with FFmpeg
-
-### Installation
-```bash
-# Windows: Download from https://ffmpeg.org/download.html
-# macOS: brew install ffmpeg  
-# Linux: sudo apt install ffmpeg
+```console
+idf.py set-target esp32p4
+idf.py -p PORT flash monitor
 ```
 
-### Basic MJPEG Conversion
-```bash
-# Convert any video to MJPEG MP4
-ffmpeg -i input.mp4 -c:v mjpeg -c:a aac output.mp4
-```
-
-### Recommended Settings
-
-**High Quality (1280x720, RGB888 displays):**
-```bash
-ffmpeg -i input.mp4 -c:v mjpeg -q:v 3 -vf scale=1280:720 -r 20 -c:a aac output.mp4
-```
-
-**Balanced (1024x768, recommended):**
-```bash
-ffmpeg -i input.mp4 -c:v mjpeg -q:v 5 -vf scale=1024:768 -r 20 -c:a aac output.mp4
-```
-
-**Low Bandwidth (800x600, RGB565 or troubleshooting):**
-```bash
-ffmpeg -i input.mp4 -c:v mjpeg -q:v 8 -vf scale=800:600 -r 15 -c:a aac output.mp4
-```
-
-### Key Parameters
-- `-q:v`: Quality (1-31, lower = better quality, larger file)
-- `-vf scale=W:H`: Resolution adjustment
-- `-r`: Frame rate (15-25 fps recommended)
-- `-an`: Remove audio if causing issues
+Replace `PORT` with the board's USB-to-UART port. Press `Ctrl-]` to leave the
+monitor. The repository Actions workflow compiles this example with ESP-IDF
+`v5.5.4` and `v6.0.2`, including RGB565 and RGB888 BSP paths. CI does not test
+media compatibility, sustained throughput, audio quality, or hardware playback.

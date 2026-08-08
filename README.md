@@ -10,7 +10,8 @@
     <a href="https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4.3.htm">🌐 Product Page</a> ·
     <a href="https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-4.3">📚 Documentation</a> ·
     <a href="firmware/">📦 Factory Firmware</a> ·
-    <a href="examples/esp-idf/">🧩 ESP-IDF Examples</a>
+    <a href="examples/esp-idf/">🧩 ESP-IDF Examples</a> ·
+    <a href="docs/README.md">📖 Repository Guide</a>
   </p>
   <img src="assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3" width="600">
 </div>
@@ -83,16 +84,19 @@ on the target board and connected accessories.
 
 ## 🛠️ Continuous Integration
 
-| Surface | Version | Projects |
-| --- | --- | ---: |
-| ESP-IDF | `v5.5.4` | 12 |
-| ESP-IDF | `v6.0.2` | 12 |
+| Surface | Version | Default builds | Conditional builds |
+| --- | --- | ---: | ---: |
+| ESP-IDF | `v5.5.4` | 12 | 8 |
+| ESP-IDF | `v6.0.2` | 12 | 8 |
 
 The [ESP-IDF examples workflow](.github/workflows/esp-idf-examples.yml) discovers
-first-party projects under `examples/esp-idf/`. A full run contains one
-discovery job and 24 build jobs. Manual dispatch accepts `all`, an example
-directory name, or an example path. The workflow provides compile validation
-only and does not upload flashable firmware packages.
+the 12 direct first-party projects under `examples/esp-idf/`. A full source run
+contains one preflight job and 40 build jobs: 24 defaults plus RGB888,
+Brookesia-AI, and USB-minimal configurations. Documentation-only changes run the
+preflight without ESP-IDF builds; factory-firmware changes are reported for
+release review but are never treated as example sources. Unknown paths trigger
+the complete matrix, while an empty or unreadable diff fails closed. See the
+[CI guide](docs/CI.md) for routing and evidence boundaries.
 
 ## 🗂️ Repository Layout
 
@@ -102,6 +106,8 @@ only and does not upload flashable firmware packages.
 | [`firmware/`](firmware/) | Checked-in factory and recovery image |
 | [`schematic/`](schematic/) | Product schematic |
 | [`assets/`](assets/) | Product images used by the documentation |
+| [`config/ci/`](config/ci/) | Conditional sdkconfig overlays used only by Actions |
+| [`docs/`](docs/) | Repository CI, component, and hardware-maintenance guides |
 | [`.github/`](.github/) | CI workflow and example discovery logic |
 
 ## 📚 Documentation
@@ -110,14 +116,21 @@ only and does not upload flashable firmware packages.
 - [中文产品文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)
 - [Product Schematic](schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf)
 - [ESP-IDF Examples](examples/esp-idf/)
+- [Repository Guide](docs/README.md)
+- [Continuous Integration](docs/CI.md)
+- [Component Boundaries](docs/COMPONENTS.md)
+- [Hardware Audit](docs/HARDWARE.md)
 - [中文 README](README_ZH.md)
 
 ## 🤝 Support and Contributions
 
 Contributions and reproducible issue reports are welcome. Include the product
 and hardware revision, example path, ESP-IDF version, reproduction steps,
-expected behavior, actual behavior, and relevant build or serial logs.
+expected behavior, actual behavior, and relevant build or serial logs. Review
+the repository boundaries before changing local components or factory firmware.
 
+- [Contributing Guide](CONTRIBUTING.md)
+- [Support Policy](SUPPORT.md)
 - [Open an Issue](https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-4.3/issues)
 - [Waveshare Support](https://www.waveshare.com/contact_us)
 

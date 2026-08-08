@@ -1,0 +1,55 @@
+name: Product example bug report
+description: Report a reproducible problem in this repository.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: Do not include Wi-Fi credentials, tokens, private paths, device serial numbers, or sensitive security details.
+  - type: input
+    id: board
+    attributes:
+      label: Product and board revision
+      placeholder: ESP32-P4-WIFI6-Touch-LCD-4.3, revision shown on the PCB
+    validations:
+      required: true
+  - type: input
+    id: example
+    attributes:
+      label: Example path
+      placeholder: examples/esp-idf/09_video_lcd_display
+    validations:
+      required: true
+  - type: input
+    id: idf
+    attributes:
+      label: ESP-IDF version
+      placeholder: v5.5.4 or v6.0.2, including the exact commit if modified
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include configuration changes, connected peripherals, and the smallest repeatable sequence.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result and relevant log
+      render: shell
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Public-data confirmation
+      options:
+        - label: I removed credentials, private paths, device identifiers, and unrelated log output.
+          required: true
