@@ -33,9 +33,10 @@ partial upgrade.
 Example 12 downloads `usb_device_uac` 1.2.0 but marks it non-required. Its
 component link is enabled only with UAC audio, allowing the minimal HID/display
 configuration to resolve without an unconditional UAC build dependency. Older
-IDF can still compile the downloaded target, so a target-private TinyUSB audio
-definition is applied only when that target exists; the product descriptor and
-app remain disabled.
+IDF can still compile the downloaded target. After top-level `project()` creates
+managed component targets, a `TARGET` guard applies a private TinyUSB audio
+definition only to that UAC target; the product descriptor and app remain
+disabled.
 
 The exact registry artifact corresponding to the local 4.3-inch BSP has not
 been established as equivalent to this snapshot. A future migration must pin a

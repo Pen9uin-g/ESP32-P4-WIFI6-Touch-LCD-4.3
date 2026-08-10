@@ -23,15 +23,20 @@ class RepositoryCheckTests(unittest.TestCase):
             '    # Download for the opt-in UAC path; do not require it for minimal builds.\n'
             '    require: no\n'
         )
-        cmake = (
+        main_cmake = (
             "if(CONFIG_UAC_AUDIO_ENABLE)\n"
             '    list (APPEND srcs "app_uac.c")\n'
             "    list(APPEND priv_requires espressif__usb_device_uac)\n"
             "endif()\n"
             "idf_component_register(PRIV_REQUIRES ${priv_requires})\n"
+        )
+        project_cmake = (
+            "cmake_minimum_required(VERSION 3.16)\n"
+            "project(usb_touch_screen)\n"
+            "\n"
             "if(NOT CONFIG_UAC_AUDIO_ENABLE)\n"
-            "    # The downloaded-but-unlinked UAC target still compiles under older IDF;\n"
-            "    # only its translation unit needs TinyUSB audio declarations.\n"
+            "    # project() creates managed component targets; an older IDF can still compile\n"
+            "    # this downloaded-but-unlinked UAC target, so only it needs TinyUSB audio declarations.\n"
             "    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)\n"
             "    if(TARGET ${uac_lib})\n"
             "        target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
@@ -47,31 +52,67 @@ class RepositoryCheckTests(unittest.TestCase):
             "#endif\n"
             "#endif\n"
         )
-        self.assertEqual(checks.usb_audio_dependency_errors(manifest, cmake, tinyusb_config), [])
+        self.assertEqual(
+            checks.usb_audio_dependency_errors(manifest, main_cmake, project_cmake, tinyusb_config),
+            [],
+        )
         self.assertTrue(
             checks.usb_audio_dependency_errors(
-                manifest.replace("    require: no\n", ""), cmake, tinyusb_config
+                manifest.replace("    require: no\n", ""), main_cmake, project_cmake, tinyusb_config
             )
         )
         self.assertTrue(
             checks.usb_audio_dependency_errors(
                 manifest,
-                cmake.replace("    list(APPEND priv_requires espressif__usb_device_uac)\n", ""),
+                main_cmake.replace("    list(APPEND priv_requires espressif__usb_device_uac)\n", ""),
+                project_cmake,
                 tinyusb_config,
             )
         )
         self.assertTrue(
             checks.usb_audio_dependency_errors(
                 manifest,
-                cmake.replace("    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n", ""),
+                main_cmake,
+                project_cmake.replace(
+                    "    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n", ""
+                ),
                 tinyusb_config,
             )
         )
         self.assertTrue(
             checks.usb_audio_dependency_errors(
                 manifest,
-                cmake.replace("    if(TARGET ${uac_lib})\n", ""),
+                main_cmake,
+                project_cmake.replace("    if(TARGET ${uac_lib})\n", ""),
                 tinyusb_config,
+            )
+        )
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(
+                manifest,
+                main_cmake,
+                project_cmake.replace(
+                    "cmake_minimum_required(VERSION 3.16)\nproject(usb_touch_screen)\n\n", ""
+                )
+                + "project(usb_touch_screen)\n",
+                tinyusb_config,
+            )
+        )
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(
+                manifest,
+                main_cmake
+                + "target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n",
+                project_cmake,
+                tinyusb_config,
+            )
+        )
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(
+                manifest,
+                main_cmake,
+                project_cmake,
+                tinyusb_config.replace("#ifndef CFG_TUD_AUDIO\n", ""),
             )
         )
 

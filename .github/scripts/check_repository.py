@@ -119,7 +119,9 @@ def local_link_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     return errors
 
 
-def usb_audio_dependency_errors(manifest: str, cmake: str, tinyusb_config: str) -> list[str]:
+def usb_audio_dependency_errors(
+    manifest: str, main_cmake: str, project_cmake: str, tinyusb_config: str
+) -> list[str]:
     """Keep the optional UAC package outside the USB minimal build graph."""
     errors: list[str] = []
     required_manifest = (
@@ -137,22 +139,33 @@ def usb_audio_dependency_errors(manifest: str, cmake: str, tinyusb_config: str) 
         "    list(APPEND priv_requires espressif__usb_device_uac)\n"
         "endif()"
     )
-    if required_cmake not in cmake or "PRIV_REQUIRES ${priv_requires}" not in cmake:
+    if required_cmake not in main_cmake or "PRIV_REQUIRES ${priv_requires}" not in main_cmake:
         errors.append("12_usb_extend_screen: UAC component link must remain conditional")
 
     required_private_definition = (
         "if(NOT CONFIG_UAC_AUDIO_ENABLE)\n"
-        "    # The downloaded-but-unlinked UAC target still compiles under older IDF;\n"
-        "    # only its translation unit needs TinyUSB audio declarations.\n"
+        "    # project() creates managed component targets; an older IDF can still compile\n"
+        "    # this downloaded-but-unlinked UAC target, so only it needs TinyUSB audio declarations.\n"
         "    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)\n"
         "    if(TARGET ${uac_lib})\n"
         "        target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
         "    endif()\n"
         "endif()"
     )
-    if required_private_definition not in cmake:
+    project_call = "project(usb_touch_screen)"
+    project_index = project_cmake.find(project_call)
+    definition_index = project_cmake.find(required_private_definition)
+    if definition_index == -1:
         errors.append(
-            "12_usb_extend_screen: disabled UAC needs a TARGET-guarded, target-private audio declaration"
+            "12_usb_extend_screen: disabled UAC needs a post-project, TARGET-guarded, target-private audio declaration"
+        )
+    elif project_index == -1 or definition_index < project_index:
+        errors.append(
+            "12_usb_extend_screen: disabled UAC audio declaration must follow top-level project()"
+        )
+    if "target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)" in main_cmake:
+        errors.append(
+            "12_usb_extend_screen: disabled UAC audio declaration must not run from main/CMakeLists.txt"
         )
 
     required_audio_guard = (
@@ -289,11 +302,14 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
             "10_mp4_player: esp_audio_codec must stay below v2.6 for pre-revision-3 P4 hardware"
         )
 
-    usb_cmake = (
+    usb_main_cmake = (
         repo_root / "examples" / "esp-idf" / "12_usb_extend_screen" / "main" / "CMakeLists.txt"
     ).read_text(encoding="utf-8")
-    if usb_cmake.count('"app_uac.c"') != 1:
+    if usb_main_cmake.count('"app_uac.c"') != 1:
         errors.append("12_usb_extend_screen: app_uac.c must appear once in its conditional source list")
+    usb_project_cmake = (
+        repo_root / "examples" / "esp-idf" / "12_usb_extend_screen" / "CMakeLists.txt"
+    ).read_text(encoding="utf-8")
     usb_manifest = (
         repo_root
         / "examples"
@@ -311,7 +327,11 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         / "tusb"
         / "tusb_config_uac.h"
     ).read_text(encoding="utf-8")
-    errors.extend(usb_audio_dependency_errors(usb_manifest, usb_cmake, usb_tinyusb_config))
+    errors.extend(
+        usb_audio_dependency_errors(
+            usb_manifest, usb_main_cmake, usb_project_cmake, usb_tinyusb_config
+        )
+    )
     usb_main = (
         repo_root
         / "examples"

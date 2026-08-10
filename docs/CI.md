@@ -40,9 +40,10 @@ AI disabled. The overlays in
 `sdkconfig.defaults`; they exist only to compile conditional paths and are not
 factory firmware configurations. The USB-minimal lane keeps UAC audio disabled;
 `usb_device_uac` is downloaded but linked only when UAC audio is enabled. Older
-IDF build graphs can still compile its unlinked target; only when that target
-actually exists, it receives a target-private TinyUSB audio definition. That
-does not enable product descriptors or app audio.
+IDF build graphs can still compile its unlinked target. After top-level
+`project()` creates managed component targets, a `TARGET` guard gives only that
+UAC target a private TinyUSB audio definition. It does not enable product
+descriptors or app audio.
 
 ## Evidence boundary
 
