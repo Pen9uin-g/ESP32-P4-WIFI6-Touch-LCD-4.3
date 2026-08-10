@@ -41,5 +41,5 @@ idf.py -p PORT flash monitor
 
 Replace `PORT` with the board's USB-to-UART port. Press `Ctrl-]` to leave the
 monitor. The repository Actions workflow compiles this example with ESP-IDF
-`v5.5.4` and `v6.0.2`, including RGB565 and RGB888 BSP paths. CI does not test
+`v5.5.5` and `v6.0.2`, including RGB565 and RGB888 BSP paths. CI does not test
 media compatibility, sustained throughput, audio quality, or hardware playback.

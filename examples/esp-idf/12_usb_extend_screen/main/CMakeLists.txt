@@ -1,5 +1,6 @@
 set(srcs "app_hid.c" "app_usb.c" "app_vendor.c"
          "usb_extend_screen.c" "usb_frame.c" "app_lcd_p4.c")
+set(priv_requires)
 
 if(CONFIG_HID_TOUCH_ENABLE)
     list (APPEND srcs "app_touch.c")
@@ -7,10 +8,12 @@ endif()
 
 if(CONFIG_UAC_AUDIO_ENABLE)
     list (APPEND srcs "app_uac.c")
+    list(APPEND priv_requires espressif__usb_device_uac)
 endif()
 
 idf_component_register(SRCS ${srcs}
-                       INCLUDE_DIRS "include" "tusb")
+                       INCLUDE_DIRS "include" "tusb"
+                       PRIV_REQUIRES ${priv_requires})
 
 # Determine whether tinyusb is fetched from component registry or from local path
 idf_build_get_property(build_components BUILD_COMPONENTS)

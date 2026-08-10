@@ -20,11 +20,15 @@ but not including, 2.6. Version 2.6 and newer require ESP32-P4 silicon revision
 3.0, while this product's checked-in defaults intentionally support earlier P4
 revisions. Keep this upper bound until the supported hardware floor changes.
 
-Example 11's Brookesia AI path is compiled only with ESP-IDF `v5.5.4`. Its
-current GMF 0.6 dependency set uses build-system behavior that is incompatible
-with the ESP-IDF 6 component-requirements pass. Keep AI disabled on IDF 6 until
-the complete, API-coupled GMF dependency set can be upgraded and validated
-together; replacing only `gmf_io` is not an established-safe migration.
+Example 11's Brookesia AI path is compiled only with ESP-IDF `v5.5.5`. GMF 0.6
+has no manual wakeup API, so the unused local wakeup wrapper is removed. Keep
+AI disabled on IDF 6 until the complete, API-coupled GMF dependency set can be
+upgraded and validated together: `gmf_ai_audio` adds that API only from 0.7.2,
+and replacing one GMF component is not an established-safe migration.
+
+Example 12 downloads `usb_device_uac` 1.2.0 but marks it non-required. Its
+component link is enabled only with UAC audio, allowing the minimal HID/display
+configuration to resolve without an unconditional UAC build dependency.
 
 The exact registry artifact corresponding to the local 4.3-inch BSP has not
 been established as equivalent to this snapshot. A future migration must pin a

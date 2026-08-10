@@ -23,7 +23,7 @@ body:
     id: idf
     attributes:
       label: ESP-IDF 版本
-      placeholder: v5.5.4 或 v6.0.2；如有修改请提供精确提交
+      placeholder: v5.5.5 或 v6.0.2；如有修改请提供精确提交
     validations:
       required: true
   - type: textarea

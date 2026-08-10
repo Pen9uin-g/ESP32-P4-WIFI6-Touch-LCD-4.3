@@ -105,6 +105,29 @@ def local_link_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     return errors
 
 
+def usb_audio_dependency_errors(manifest: str, cmake: str) -> list[str]:
+    """Keep the optional UAC package outside the USB minimal build graph."""
+    errors: list[str] = []
+    required_manifest = (
+        'espressif/usb_device_uac:\n'
+        '    version: "1.2.0"\n'
+        '    # Download for the opt-in UAC path; do not require it for minimal builds.\n'
+        '    require: no'
+    )
+    if required_manifest not in manifest:
+        errors.append("12_usb_extend_screen: usb_device_uac must stay optional in the manifest")
+
+    required_cmake = (
+        "if(CONFIG_UAC_AUDIO_ENABLE)\n"
+        '    list (APPEND srcs "app_uac.c")\n'
+        "    list(APPEND priv_requires espressif__usb_device_uac)\n"
+        "endif()"
+    )
+    if required_cmake not in cmake or "PRIV_REQUIRES ${priv_requires}" not in cmake:
+        errors.append("12_usb_extend_screen: UAC component link must remain conditional")
+    return errors
+
+
 def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     errors: list[str] = []
     examples = direct_examples(repo_root)
@@ -167,6 +190,15 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     ).read_text(encoding="utf-8")
     if usb_cmake.count('"app_uac.c"') != 1:
         errors.append("12_usb_extend_screen: app_uac.c must appear once in its conditional source list")
+    usb_manifest = (
+        repo_root
+        / "examples"
+        / "esp-idf"
+        / "12_usb_extend_screen"
+        / "main"
+        / "idf_component.yml"
+    ).read_text(encoding="utf-8")
+    errors.extend(usb_audio_dependency_errors(usb_manifest, usb_cmake))
     usb_tinyusb_config = (
         repo_root
         / "examples"

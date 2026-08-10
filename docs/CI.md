@@ -24,12 +24,12 @@ component test applications are not promoted to product examples.
 
 ## Build matrix
 
-The default matrix compiles all 12 product examples with ESP-IDF `v5.5.4` and
+The default matrix compiles all 12 product examples with ESP-IDF `v5.5.5` and
 `v6.0.2`, producing 24 jobs. A full source-impact run also contains 15 focused
 jobs:
 
 - 12 RGB888 jobs for examples 07 through 12 on both ESP-IDF versions;
-- 1 AI-enabled Brookesia job for example 11 on ESP-IDF `v5.5.4`;
+- 1 AI-enabled Brookesia job for example 11 on ESP-IDF `v5.5.5`;
 - 2 USB-minimal jobs with HID touch and UAC audio disabled for example 12.
 
 That makes 39 ESP-IDF build jobs in a complete matrix. Brookesia AI is not
@@ -38,7 +38,8 @@ compatible with the IDF 6 component-requirements pass; the IDF 6 default keeps
 AI disabled. The overlays in
 [`config/ci/`](../config/ci/) are appended after each project's
 `sdkconfig.defaults`; they exist only to compile conditional paths and are not
-factory firmware configurations.
+factory firmware configurations. The USB-minimal lane keeps UAC audio disabled;
+`usb_device_uac` is downloaded but linked only when UAC audio is enabled.
 
 ## Evidence boundary
 

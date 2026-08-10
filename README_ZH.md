@@ -80,7 +80,7 @@ ESP-IDF 示例固件。
 
 | 开发框架 | 版本 | 默认构建 | 条件配置构建 |
 | --- | --- | ---: | ---: |
-| ESP-IDF | `v5.5.4` | 12 | 8 |
+| ESP-IDF | `v5.5.5` | 12 | 8 |
 | ESP-IDF | `v6.0.2` | 12 | 7 |
 
 [ESP-IDF 示例工作流](.github/workflows/esp-idf-examples.yml)会发现

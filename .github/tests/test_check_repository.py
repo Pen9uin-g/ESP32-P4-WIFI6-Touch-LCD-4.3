@@ -16,6 +16,31 @@ SPEC.loader.exec_module(checks)
 
 
 class RepositoryCheckTests(unittest.TestCase):
+    def test_usb_audio_dependency_boundary(self) -> None:
+        manifest = (
+            'espressif/usb_device_uac:\n'
+            '    version: "1.2.0"\n'
+            '    # Download for the opt-in UAC path; do not require it for minimal builds.\n'
+            '    require: no\n'
+        )
+        cmake = (
+            "if(CONFIG_UAC_AUDIO_ENABLE)\n"
+            '    list (APPEND srcs "app_uac.c")\n'
+            "    list(APPEND priv_requires espressif__usb_device_uac)\n"
+            "endif()\n"
+            "idf_component_register(PRIV_REQUIRES ${priv_requires})\n"
+        )
+        self.assertEqual(checks.usb_audio_dependency_errors(manifest, cmake), [])
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(manifest.replace("    require: no\n", ""), cmake)
+        )
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(
+                manifest,
+                cmake.replace("    list(APPEND priv_requires espressif__usb_device_uac)\n", ""),
+            )
+        )
+
     def test_markdown_targets_ignore_fenced_examples(self) -> None:
         text = "[real](docs/CI.md)\n```md\n[example](missing.md)\n```\n"
         self.assertEqual(checks.markdown_targets(text), ["docs/CI.md"])

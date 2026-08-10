@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 
 
 EXAMPLES_ROOT = PurePosixPath("examples/esp-idf")
-DEFAULT_IDF_VERSIONS = ("v5.5.4", "v6.0.2")
+DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
 GLOBAL_BUILD_PATTERNS = (
     ".github/workflows/esp-idf-examples.yml",
     ".github/scripts/discover_esp_idf_examples.py",
@@ -211,7 +211,7 @@ def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str
     if name in RGB888_EXAMPLES:
         overlay = "usb_rgb888.defaults" if name == "12_usb_extend_screen" else "rgb888.defaults"
         variants.append(("rgb888", f"../../../config/ci/{overlay}"))
-    if name == "11_esp_brookesia_phone" and idf_version == "v5.5.4":
+    if name == "11_esp_brookesia_phone" and idf_version == "v5.5.5":
         variants.append(("ai", "../../../config/ci/brookesia_ai.defaults"))
     if name == "12_usb_extend_screen":
         variants.append(("minimal", "../../../config/ci/usb_minimal.defaults"))

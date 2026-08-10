@@ -35,5 +35,5 @@ idf.py -p PORT flash monitor
 ```
 
 请将 `PORT` 替换为开发板的 USB 转 UART 串口，按 `Ctrl-]` 退出监视器。仓库
-Actions 会使用 ESP-IDF `v5.5.4` 和 `v6.0.2` 编译本示例，并覆盖 BSP 的 RGB565
+Actions 会使用 ESP-IDF `v5.5.5` 和 `v6.0.2` 编译本示例，并覆盖 BSP 的 RGB565
 与 RGB888 路径。CI 不会验证媒体兼容性、持续吞吐量、音质或硬件播放效果。

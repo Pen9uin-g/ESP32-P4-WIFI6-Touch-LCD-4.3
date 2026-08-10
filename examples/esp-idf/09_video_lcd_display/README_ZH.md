@@ -15,7 +15,7 @@ V4L2 设备读取实际协商的摄像头尺寸，通过 ESP32-P4 的 PPA 转换
 
 - ESP32-P4-WIFI6-Touch-LCD-4.3 开发板。
 - 连接到板载 15PIN MIPI-CSI 接口的兼容 OV5647 摄像头。
-- ESP-IDF `v5.5.4` 或 `v6.0.2`；仓库 Actions 会编译验证这两个版本。
+- ESP-IDF `v5.5.5` 或 `v6.0.2`；仓库 Actions 会编译验证这两个版本。
 - 用于供电、烧录和串口输出的 USB 连接。
 
 上电前请根据[官方产品文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)

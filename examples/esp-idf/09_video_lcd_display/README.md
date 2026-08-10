@@ -16,7 +16,7 @@ view therefore depend on the connected module and its installation.
 
 - An ESP32-P4-WIFI6-Touch-LCD-4.3.
 - A compatible OV5647 camera connected to the board's 15-pin MIPI-CSI socket.
-- ESP-IDF `v5.5.4` or `v6.0.2`, the versions compiled by this repository's
+- ESP-IDF `v5.5.5` or `v6.0.2`, the versions compiled by this repository's
   Actions workflow.
 - A USB connection for power, flashing, and serial output.
 

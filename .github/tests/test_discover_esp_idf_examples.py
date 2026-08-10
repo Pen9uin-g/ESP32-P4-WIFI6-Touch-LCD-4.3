@@ -74,6 +74,7 @@ class DiscoveryTests(unittest.TestCase):
         )
 
     def test_full_matrix_has_default_and_conditional_lanes(self) -> None:
+        self.assertEqual(discover.DEFAULT_IDF_VERSIONS, ("v5.5.5", "v6.0.2"))
         examples = [
             f"examples/esp-idf/{name}"
             for name in (
@@ -97,6 +98,9 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(sum(item["variant"] == "rgb888" for item in matrix), 12)
         self.assertEqual(sum(item["variant"] == "ai" for item in matrix), 1)
         self.assertEqual(sum(item["variant"] == "minimal" for item in matrix), 2)
+        self.assertEqual(
+            [item["idf_version"] for item in matrix if item["variant"] == "ai"], ["v5.5.5"]
+        )
         self.assertFalse(
             any(
                 item["variant"] == "ai" and item["idf_version"] == "v6.0.2"

@@ -86,7 +86,7 @@ on the target board and connected accessories.
 
 | Surface | Version | Default builds | Conditional builds |
 | --- | --- | ---: | ---: |
-| ESP-IDF | `v5.5.4` | 12 | 8 |
+| ESP-IDF | `v5.5.5` | 12 | 8 |
 | ESP-IDF | `v6.0.2` | 12 | 7 |
 
 The [ESP-IDF examples workflow](.github/workflows/esp-idf-examples.yml) discovers
