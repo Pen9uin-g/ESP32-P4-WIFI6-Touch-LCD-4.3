@@ -42,6 +42,20 @@ REQUIRED_CI_DEFAULTS = (
     "config/ci/brookesia_ai.defaults",
     "config/ci/usb_minimal.defaults",
 )
+REQUIRED_HOMEPAGE_COMPONENTS = {
+    "centered_header",
+    "html_h1",
+    "subtitle",
+    "badges",
+    "language_switch",
+    "quick_links",
+    "hero_image",
+    "separator",
+    "h2",
+}
+REQUIRED_HOMEPAGE_QUICK_LINKS = {"product", "documentation", "firmware", "esp_idf"}
+REQUIRED_HOMEPAGE_BADGES = {"build", "license"}
+REQUIRED_HOMEPAGE_H2_ICONS = ["✨", "🖥️", "📦", "🧪", "🛠️", "🗂️", "📚", "🤝", "📄"]
 
 
 def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
@@ -131,11 +145,15 @@ def usb_audio_dependency_errors(manifest: str, cmake: str, tinyusb_config: str) 
         "    # The downloaded-but-unlinked UAC target still compiles under older IDF;\n"
         "    # only its translation unit needs TinyUSB audio declarations.\n"
         "    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)\n"
-        "    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
+        "    if(TARGET ${uac_lib})\n"
+        "        target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
+        "    endif()\n"
         "endif()"
     )
     if required_private_definition not in cmake:
-        errors.append("12_usb_extend_screen: disabled UAC needs a target-private audio declaration")
+        errors.append(
+            "12_usb_extend_screen: disabled UAC needs a TARGET-guarded, target-private audio declaration"
+        )
 
     required_audio_guard = (
         "#ifndef CFG_TUD_AUDIO\n"
@@ -148,6 +166,67 @@ def usb_audio_dependency_errors(manifest: str, cmake: str, tinyusb_config: str) 
     )
     if required_audio_guard not in tinyusb_config:
         errors.append("12_usb_extend_screen: TinyUSB audio setting must allow a private override")
+    return errors
+
+
+def brookesia_ai_compatibility_errors(cmake: str, coze_source: str) -> list[str]:
+    """Keep the GMF 0.6 C++ compatibility layer local to the optional AI path."""
+    errors: list[str] = []
+    required_cxx_flag = (
+        'set(SRCS_CPP_COMPILE_FLAGS "-Wno-missing-field-initializers -Wno-format")\n'
+        "if(CONFIG_ESP_BROOKESIA_ENABLE_AI_FRAMEWORK)\n"
+        '    string(APPEND SRCS_CPP_COMPILE_FLAGS " -fpermissive")\n'
+        "endif()"
+    )
+    if required_cxx_flag not in cmake:
+        errors.append(
+            "11_esp_brookesia_phone: AI profile requires a local C++ -fpermissive compatibility flag"
+        )
+    if "esp_gmf_afe_keep_awake" in coze_source:
+        errors.append(
+            "11_esp_brookesia_phone: GMF 0.6 source must not call esp_gmf_afe_keep_awake"
+        )
+    return errors
+
+
+def homepage_policy_errors(audit_policy: object) -> list[str]:
+    """Require the configured bilingual homepage to retain its single-product contract."""
+    if not isinstance(audit_policy, dict):
+        return ["Markdown audit policy must be a JSON object"]
+
+    homepage_pairs = audit_policy.get("homepage_pairs")
+    if not isinstance(homepage_pairs, list):
+        return ["Markdown audit policy: missing homepage_pairs list for README.md and README_ZH.md"]
+
+    homepage = next(
+        (
+            pair
+            for pair in homepage_pairs
+            if isinstance(pair, dict)
+            and pair.get("english") == "README.md"
+            and pair.get("chinese") == "README_ZH.md"
+        ),
+        None,
+    )
+    if homepage is None:
+        return ["Markdown audit policy: missing README.md/README_ZH.md single-product homepage pair"]
+
+    errors: list[str] = []
+    if homepage.get("profile") != "single-product":
+        errors.append("Markdown audit policy: README homepage profile must be single-product")
+    components = homepage.get("required_components")
+    if not isinstance(components, list) or not REQUIRED_HOMEPAGE_COMPONENTS.issubset(components):
+        errors.append("Markdown audit policy: README homepage must require its complete visual header and h2 components")
+    quick_links = homepage.get("required_quick_links")
+    if not isinstance(quick_links, list) or not REQUIRED_HOMEPAGE_QUICK_LINKS.issubset(quick_links):
+        errors.append("Markdown audit policy: README homepage must require product, documentation, firmware, and esp_idf quick links")
+    badges = homepage.get("required_badges")
+    if not isinstance(badges, list) or not REQUIRED_HOMEPAGE_BADGES.issubset(badges):
+        errors.append("Markdown audit policy: README homepage must require build and license badges")
+    if homepage.get("required_h2_icons") != REQUIRED_HOMEPAGE_H2_ICONS:
+        errors.append("Markdown audit policy: README homepage h2 icon order must match the bilingual homepage")
+    if homepage.get("h3_emoji_allow_patterns") != []:
+        errors.append("Markdown audit policy: README homepage h3 headings must use the default no-emoji policy")
     return errors
 
 
@@ -169,9 +248,11 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
 
     audit_policy = repo_root / ".github" / "markdown-audit.json"
     try:
-        json.loads(audit_policy.read_text(encoding="utf-8"))
+        policy = json.loads(audit_policy.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         errors.append(f"invalid Markdown audit policy: {error}")
+    else:
+        errors.extend(homepage_policy_errors(policy))
 
     for example in examples:
         defaults = example / "sdkconfig.defaults"
@@ -241,6 +322,28 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     ).read_text(encoding="utf-8")
     if "app_uac_init" in usb_main:
         errors.append("12_usb_extend_screen: UAC initialization must be owned by app_usb only")
+
+    brookesia_cmake = (
+        repo_root
+        / "examples"
+        / "esp-idf"
+        / "11_esp_brookesia_phone"
+        / "components"
+        / "brookesia_core"
+        / "CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    coze_source = (
+        repo_root
+        / "examples"
+        / "esp-idf"
+        / "11_esp_brookesia_phone"
+        / "components"
+        / "brookesia_core"
+        / "ai_framework"
+        / "agent"
+        / "coze_chat_app.cpp"
+    ).read_text(encoding="utf-8")
+    errors.extend(brookesia_ai_compatibility_errors(brookesia_cmake, coze_source))
 
     firmware = sorted((repo_root / "firmware").glob("*.bin"))
     if len(firmware) != 1:

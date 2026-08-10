@@ -34,7 +34,9 @@ if(NOT CONFIG_UAC_AUDIO_ENABLE)
     # The downloaded-but-unlinked UAC target still compiles under older IDF;
     # only its translation unit needs TinyUSB audio declarations.
     idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)
-    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)
+    if(TARGET ${uac_lib})
+        target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)
+    endif()
 endif()
 
 idf_build_get_property(build_components BUILD_COMPONENTS)

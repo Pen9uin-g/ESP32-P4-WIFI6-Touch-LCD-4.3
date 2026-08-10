@@ -21,16 +21,21 @@ but not including, 2.6. Version 2.6 and newer require ESP32-P4 silicon revision
 revisions. Keep this upper bound until the supported hardware floor changes.
 
 Example 11's Brookesia AI path is compiled only with ESP-IDF `v5.5.5`. GMF 0.6
-has no manual wakeup API, so the unused local wakeup wrapper is removed. Keep
-AI disabled on IDF 6 until the complete, API-coupled GMF dependency set can be
-upgraded and validated together: `gmf_ai_audio` adds that API only from 0.7.2,
-and replacing one GMF component is not an established-safe migration.
+lacks the newer wake and keep-awake APIs used by Brookesia, so the speaking timer
+and state flow do not call the unavailable keep-awake API. When the optional AI
+framework is enabled, only `brookesia_core` C++ sources add `-fpermissive` for
+GMF 0.6 C headers; default and non-AI profiles do not receive that flag. Keep AI
+disabled on IDF 6 until the complete, API-coupled GMF dependency set can be
+upgraded and validated together: the `gmf_ai_audio` 0.7.2 evidence applies only
+to its trigger wake/sleep API and does not establish a keep-awake API or a safe
+partial upgrade.
 
 Example 12 downloads `usb_device_uac` 1.2.0 but marks it non-required. Its
 component link is enabled only with UAC audio, allowing the minimal HID/display
 configuration to resolve without an unconditional UAC build dependency. Older
-IDF still compiles the downloaded target, so it receives a target-private
-TinyUSB audio definition only; the product descriptor and app remain disabled.
+IDF can still compile the downloaded target, so a target-private TinyUSB audio
+definition is applied only when that target exists; the product descriptor and
+app remain disabled.
 
 The exact registry artifact corresponding to the local 4.3-inch BSP has not
 been established as equivalent to this snapshot. A future migration must pin a

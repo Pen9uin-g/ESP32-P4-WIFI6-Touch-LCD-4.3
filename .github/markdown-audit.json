@@ -23,6 +23,10 @@
   ],
   "bilingual_pairs": [
     {
+      "english": "README.md",
+      "chinese": "README_ZH.md"
+    },
+    {
       "english": "CONTRIBUTING.md",
       "chinese": "CONTRIBUTING_ZH.md"
     },
@@ -57,6 +61,46 @@
     {
       "english": "examples/esp-idf/11_esp_brookesia_phone/README.md",
       "chinese": "examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"
+    }
+  ],
+  "homepage_pairs": [
+    {
+      "english": "README.md",
+      "chinese": "README_ZH.md",
+      "profile": "single-product",
+      "required_components": [
+        "centered_header",
+        "html_h1",
+        "subtitle",
+        "badges",
+        "language_switch",
+        "quick_links",
+        "hero_image",
+        "separator",
+        "h2"
+      ],
+      "required_quick_links": [
+        "product",
+        "documentation",
+        "firmware",
+        "esp_idf"
+      ],
+      "required_badges": [
+        "build",
+        "license"
+      ],
+      "required_h2_icons": [
+        "✨",
+        "🖥️",
+        "📦",
+        "🧪",
+        "🛠️",
+        "🗂️",
+        "📚",
+        "🤝",
+        "📄"
+      ],
+      "h3_emoji_allow_patterns": []
     }
   ],
   "pair_exempt_patterns": [

@@ -33,7 +33,9 @@ class RepositoryCheckTests(unittest.TestCase):
             "    # The downloaded-but-unlinked UAC target still compiles under older IDF;\n"
             "    # only its translation unit needs TinyUSB audio declarations.\n"
             "    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)\n"
-            "    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
+            "    if(TARGET ${uac_lib})\n"
+            "        target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
+            "    endif()\n"
             "endif()\n"
         )
         tinyusb_config = (
@@ -65,6 +67,57 @@ class RepositoryCheckTests(unittest.TestCase):
                 tinyusb_config,
             )
         )
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(
+                manifest,
+                cmake.replace("    if(TARGET ${uac_lib})\n", ""),
+                tinyusb_config,
+            )
+        )
+
+    def test_brookesia_ai_compatibility_boundary(self) -> None:
+        cmake = (
+            'set(SRCS_CPP_COMPILE_FLAGS "-Wno-missing-field-initializers -Wno-format")\n'
+            "if(CONFIG_ESP_BROOKESIA_ENABLE_AI_FRAMEWORK)\n"
+            '    string(APPEND SRCS_CPP_COMPILE_FLAGS " -fpermissive")\n'
+            "endif()\n"
+        )
+        coze_source = "static void change_speaking_state(bool speaking) {}\n"
+        self.assertEqual(checks.brookesia_ai_compatibility_errors(cmake, coze_source), [])
+        self.assertTrue(
+            checks.brookesia_ai_compatibility_errors(
+                cmake.replace('    string(APPEND SRCS_CPP_COMPILE_FLAGS " -fpermissive")\n', ""),
+                coze_source,
+            )
+        )
+        self.assertTrue(
+            checks.brookesia_ai_compatibility_errors(
+                cmake,
+                "esp_gmf_afe_keep_awake(audio_processor_get_afe_handle(), true);\n",
+            )
+        )
+
+    def test_single_product_homepage_policy(self) -> None:
+        policy = {
+            "homepage_pairs": [
+                {
+                    "english": "README.md",
+                    "chinese": "README_ZH.md",
+                    "profile": "single-product",
+                    "required_components": sorted(checks.REQUIRED_HOMEPAGE_COMPONENTS),
+                    "required_quick_links": sorted(checks.REQUIRED_HOMEPAGE_QUICK_LINKS),
+                    "required_badges": sorted(checks.REQUIRED_HOMEPAGE_BADGES),
+                    "required_h2_icons": checks.REQUIRED_HOMEPAGE_H2_ICONS,
+                    "h3_emoji_allow_patterns": [],
+                }
+            ]
+        }
+        self.assertEqual(checks.homepage_policy_errors(policy), [])
+        policy["homepage_pairs"][0]["required_components"].remove("hero_image")
+        self.assertTrue(checks.homepage_policy_errors(policy))
+        policy["homepage_pairs"][0]["required_components"].append("hero_image")
+        policy["homepage_pairs"][0]["required_quick_links"].remove("product")
+        self.assertTrue(checks.homepage_policy_errors(policy))
 
     def test_markdown_targets_ignore_fenced_examples(self) -> None:
         text = "[real](docs/CI.md)\n```md\n[example](missing.md)\n```\n"

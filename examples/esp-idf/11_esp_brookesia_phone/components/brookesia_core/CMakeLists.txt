@@ -171,6 +171,9 @@ target_compile_options(${COMPONENT_LIB}
 )
 set(SRCS_C_COMPILE_FLAGS "-Wno-format")
 set(SRCS_CPP_COMPILE_FLAGS "-Wno-missing-field-initializers -Wno-format")
+if(CONFIG_ESP_BROOKESIA_ENABLE_AI_FRAMEWORK)
+    string(APPEND SRCS_CPP_COMPILE_FLAGS " -fpermissive")
+endif()
 set_source_files_properties(
     ${SRCS_CPP}
     PROPERTIES
