@@ -14,10 +14,12 @@ extern "C" {
 //------------- CLASS -------------//
 // The number of audio interfaces. Disabled Kconfig booleans are not emitted
 // into sdkconfig.h, so map both Kconfig states to a numeric TinyUSB value.
+#ifndef CFG_TUD_AUDIO
 #if CONFIG_UAC_AUDIO_ENABLE
 #define CFG_TUD_AUDIO             1
 #else
 #define CFG_TUD_AUDIO             0
+#endif
 #endif
 
 //--------------------------------------------------------------------

@@ -39,7 +39,9 @@ AI disabled. The overlays in
 [`config/ci/`](../config/ci/) are appended after each project's
 `sdkconfig.defaults`; they exist only to compile conditional paths and are not
 factory firmware configurations. The USB-minimal lane keeps UAC audio disabled;
-`usb_device_uac` is downloaded but linked only when UAC audio is enabled.
+`usb_device_uac` is downloaded but linked only when UAC audio is enabled. Older
+IDF still compiles its unlinked target with a target-private TinyUSB audio
+definition; that does not enable product descriptors or app audio.
 
 ## Evidence boundary
 

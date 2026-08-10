@@ -29,15 +29,40 @@ class RepositoryCheckTests(unittest.TestCase):
             "    list(APPEND priv_requires espressif__usb_device_uac)\n"
             "endif()\n"
             "idf_component_register(PRIV_REQUIRES ${priv_requires})\n"
+            "if(NOT CONFIG_UAC_AUDIO_ENABLE)\n"
+            "    # The downloaded-but-unlinked UAC target still compiles under older IDF;\n"
+            "    # only its translation unit needs TinyUSB audio declarations.\n"
+            "    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)\n"
+            "    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
+            "endif()\n"
         )
-        self.assertEqual(checks.usb_audio_dependency_errors(manifest, cmake), [])
+        tinyusb_config = (
+            "#ifndef CFG_TUD_AUDIO\n"
+            "#if CONFIG_UAC_AUDIO_ENABLE\n"
+            "#define CFG_TUD_AUDIO             1\n"
+            "#else\n"
+            "#define CFG_TUD_AUDIO             0\n"
+            "#endif\n"
+            "#endif\n"
+        )
+        self.assertEqual(checks.usb_audio_dependency_errors(manifest, cmake, tinyusb_config), [])
         self.assertTrue(
-            checks.usb_audio_dependency_errors(manifest.replace("    require: no\n", ""), cmake)
+            checks.usb_audio_dependency_errors(
+                manifest.replace("    require: no\n", ""), cmake, tinyusb_config
+            )
         )
         self.assertTrue(
             checks.usb_audio_dependency_errors(
                 manifest,
                 cmake.replace("    list(APPEND priv_requires espressif__usb_device_uac)\n", ""),
+                tinyusb_config,
+            )
+        )
+        self.assertTrue(
+            checks.usb_audio_dependency_errors(
+                manifest,
+                cmake.replace("    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n", ""),
+                tinyusb_config,
             )
         )
 

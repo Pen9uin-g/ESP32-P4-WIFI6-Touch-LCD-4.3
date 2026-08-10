@@ -30,6 +30,13 @@ target_sources(${tusb_lib} PUBLIC "${PROJECT_DIR}/main/tusb/usb_descriptors.c")
 cmake_policy(SET CMP0079 NEW)
 target_link_libraries(${tusb_lib} PRIVATE ${COMPONENT_LIB})
 
+if(NOT CONFIG_UAC_AUDIO_ENABLE)
+    # The downloaded-but-unlinked UAC target still compiles under older IDF;
+    # only its translation unit needs TinyUSB audio declarations.
+    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)
+    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)
+endif()
+
 idf_build_get_property(build_components BUILD_COMPONENTS)
 if("lvgl__lvgl" IN_LIST build_components)
     idf_component_get_property(LVGL_LIB lvgl__lvgl COMPONENT_LIB)

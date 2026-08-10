@@ -28,7 +28,9 @@ and replacing one GMF component is not an established-safe migration.
 
 Example 12 downloads `usb_device_uac` 1.2.0 but marks it non-required. Its
 component link is enabled only with UAC audio, allowing the minimal HID/display
-configuration to resolve without an unconditional UAC build dependency.
+configuration to resolve without an unconditional UAC build dependency. Older
+IDF still compiles the downloaded target, so it receives a target-private
+TinyUSB audio definition only; the product descriptor and app remain disabled.
 
 The exact registry artifact corresponding to the local 4.3-inch BSP has not
 been established as equivalent to this snapshot. A future migration must pin a

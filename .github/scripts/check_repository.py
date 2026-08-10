@@ -105,7 +105,7 @@ def local_link_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     return errors
 
 
-def usb_audio_dependency_errors(manifest: str, cmake: str) -> list[str]:
+def usb_audio_dependency_errors(manifest: str, cmake: str, tinyusb_config: str) -> list[str]:
     """Keep the optional UAC package outside the USB minimal build graph."""
     errors: list[str] = []
     required_manifest = (
@@ -125,6 +125,29 @@ def usb_audio_dependency_errors(manifest: str, cmake: str) -> list[str]:
     )
     if required_cmake not in cmake or "PRIV_REQUIRES ${priv_requires}" not in cmake:
         errors.append("12_usb_extend_screen: UAC component link must remain conditional")
+
+    required_private_definition = (
+        "if(NOT CONFIG_UAC_AUDIO_ENABLE)\n"
+        "    # The downloaded-but-unlinked UAC target still compiles under older IDF;\n"
+        "    # only its translation unit needs TinyUSB audio declarations.\n"
+        "    idf_component_get_property(uac_lib espressif__usb_device_uac COMPONENT_LIB)\n"
+        "    target_compile_definitions(${uac_lib} PRIVATE CFG_TUD_AUDIO=1)\n"
+        "endif()"
+    )
+    if required_private_definition not in cmake:
+        errors.append("12_usb_extend_screen: disabled UAC needs a target-private audio declaration")
+
+    required_audio_guard = (
+        "#ifndef CFG_TUD_AUDIO\n"
+        "#if CONFIG_UAC_AUDIO_ENABLE\n"
+        "#define CFG_TUD_AUDIO             1\n"
+        "#else\n"
+        "#define CFG_TUD_AUDIO             0\n"
+        "#endif\n"
+        "#endif"
+    )
+    if required_audio_guard not in tinyusb_config:
+        errors.append("12_usb_extend_screen: TinyUSB audio setting must allow a private override")
     return errors
 
 
@@ -198,7 +221,6 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         / "main"
         / "idf_component.yml"
     ).read_text(encoding="utf-8")
-    errors.extend(usb_audio_dependency_errors(usb_manifest, usb_cmake))
     usb_tinyusb_config = (
         repo_root
         / "examples"
@@ -208,13 +230,7 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         / "tusb"
         / "tusb_config_uac.h"
     ).read_text(encoding="utf-8")
-    audio_guard = (
-        "#if CONFIG_UAC_AUDIO_ENABLE",
-        "#define CFG_TUD_AUDIO             1",
-        "#define CFG_TUD_AUDIO             0",
-    )
-    if not all(required in usb_tinyusb_config for required in audio_guard):
-        errors.append("12_usb_extend_screen: TinyUSB audio class must follow UAC_AUDIO_ENABLE")
+    errors.extend(usb_audio_dependency_errors(usb_manifest, usb_cmake, usb_tinyusb_config))
     usb_main = (
         repo_root
         / "examples"
