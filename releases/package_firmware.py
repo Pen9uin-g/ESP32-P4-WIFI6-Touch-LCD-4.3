@@ -18,6 +18,7 @@ BOARD = "ESP32-P4-WIFI6-Touch-LCD-4.3"
 CHIP = "esp32p4"
 BAUD = 921600
 MAX_FLASH_BYTES = 32 * 1024 * 1024
+WORKFLOW = "esp-idf-examples.yml"
 SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 FRAMEWORK_VERSION = re.compile(r"^v\d+\.\d+\.\d+$")
 PROTECTED_ESPTOOL_TOKENS = {
@@ -116,6 +117,13 @@ def manifest_git_sha() -> str:
     return value.lower() if re.fullmatch(r"[0-9a-fA-F]{40}", value) else value
 
 
+def manifest_run_id() -> int:
+    value = os.environ.get("PACKAGE_RUN_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]*", value):
+        raise ValueError("packaging requires a positive PACKAGE_RUN_ID")
+    return int(value)
+
+
 def archive_name(path: Path, used: set[str]) -> str:
     candidate = f"bin/{path.name}"
     stem, suffix, counter = path.stem, path.suffix, 2
@@ -126,22 +134,33 @@ def archive_name(path: Path, used: set[str]) -> str:
     return candidate
 
 
-def flatten_options(values: object, description: str) -> list[str]:
-    """Convert ESP-IDF-generated option objects without inventing values."""
-    if values in (None, ""):
-        return []
-    if isinstance(values, list) and all(isinstance(item, str) for item in values):
-        return list(values)
-    if not isinstance(values, dict):
-        raise ValueError(f"flasher_args.json {description} must be an object or string list")
+def generated_esptool_args(values: object) -> list[str]:
+    if not isinstance(values, dict) or set(values) - {"before", "after", "stub", "chip"}:
+        raise ValueError("flasher_args.json extra_esptool_args has unsupported fields")
+    if values.get("chip") != CHIP or not isinstance(values.get("stub", False), bool):
+        raise ValueError("flasher_args.json must specify esp32p4 and a boolean stub setting")
     result: list[str] = []
-    for key, value in values.items():
-        flag = str(key) if str(key).startswith("-") else f"--{key}"
-        if isinstance(value, bool):
-            if value:
-                result.append(flag)
-        elif value not in (None, ""):
-            result.extend((flag, str(value)))
+    for name, allowed in (("before", {"default_reset", "no_reset"}), ("after", {"hard_reset", "no_reset"})):
+        value = values.get(name)
+        if value is not None:
+            if value not in allowed: raise ValueError(f"unsupported {name} setting")
+            result.extend((f"--{name}", value))
+    if values.get("stub"):
+        result.append("--stub")
+    return result
+
+
+def generated_write_args(values: object) -> list[str]:
+    allowed = {"flash_mode": {"qio", "qout", "dio", "dout", "keep"}, "flash_freq": {"keep", "20m", "26m", "40m", "80m"}, "flash_size": {"keep", "detect", "2MB", "4MB", "8MB", "16MB", "32MB"}, "compress": {True, False}}
+    if not isinstance(values, dict) or set(values) - set(allowed):
+        raise ValueError("flasher_args.json flash_settings has unsupported fields")
+    result: list[str] = []
+    for name in ("flash_mode", "flash_freq", "flash_size"):
+        if name in values:
+            if values[name] not in allowed[name]: raise ValueError(f"unsupported {name} setting")
+            result.extend((f"--{name}", values[name]))
+    if values.get("compress") is True: result.append("--compress")
+    if "compress" in values and type(values["compress"]) is not bool: raise ValueError("compress must be boolean")
     return result
 
 
@@ -185,16 +204,8 @@ def package_esp_idf(project: Path, build_dir: Path, framework_version: str, vari
     flash_files = raw_args.get("flash_files")
     if not isinstance(flash_files, dict) or not flash_files:
         raise ValueError("flasher_args.json must contain a non-empty flash_files object")
-    esptool_args = reject_protected_esptool_tokens(
-        strip_verified_chip_option(
-            flatten_options(raw_args.get("extra_esptool_args", {}), "extra_esptool_args")
-        ),
-        "extra_esptool_args",
-    )
-    write_args = reject_protected_esptool_tokens(
-        flatten_options(raw_args.get("flash_settings", {}), "flash_settings"),
-        "flash_settings",
-    )
+    esptool_args = generated_esptool_args(raw_args.get("extra_esptool_args", {}))
+    write_args = generated_write_args(raw_args.get("flash_settings", {}))
     records: list[dict[str, object]] = []
     sources: list[tuple[Path, str]] = []
     used_names: set[str] = set()
@@ -220,6 +231,8 @@ def package_esp_idf(project: Path, build_dir: Path, framework_version: str, vari
             raise ValueError("flasher_args.json contains overlapping flash ranges")
     command, shell, batch = flash_helpers(records, esptool_args, write_args)
     project_path = project.relative_to(repo_root).as_posix()
+    git_sha = manifest_git_sha()
+    run_id = manifest_run_id()
     manifest = {
         "schema_version": 1,
         "board": BOARD,
@@ -230,7 +243,12 @@ def package_esp_idf(project: Path, build_dir: Path, framework_version: str, vari
         "target": CHIP,
         "project_path": project_path,
         "source_project": project_path,
-        "git_sha": manifest_git_sha(),
+        "git_sha": git_sha,
+        "run_sha": git_sha,
+        "run_id": run_id,
+        "flash_size_bytes": MAX_FLASH_BYTES,
+        "artifact_name": f"firmware-esp-idf-{slugify(project.name)}-{framework_version}-{slugify(variant)}",
+        "workflow": WORKFLOW,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "flash": {"baud": BAUD, "esptool_args": esptool_args, "write_args": write_args, "command": command},
         "files": records,

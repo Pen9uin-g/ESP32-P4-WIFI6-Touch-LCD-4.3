@@ -43,6 +43,11 @@ jobs:
       - name: Test repository CI helpers
         run: python .github/tests/run_tests.py
 
+      - name: Test shared CI firmware flasher offline
+        run: |
+          python scripts/ci_firmware.py self-test
+          sh Flash-CI-Firmware.sh self-test
+
       - name: Audit repository metadata and local links
         run: python .github/scripts/check_repository.py
 
@@ -136,6 +141,7 @@ jobs:
       - name: Package flashable CI artifact
         env:
           PACKAGE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PACKAGE_RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
           python releases/package_firmware.py \

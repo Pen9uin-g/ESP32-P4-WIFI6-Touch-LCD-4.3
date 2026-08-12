@@ -2,31 +2,55 @@
 
 [English](CI_FIRMWARE.md) · [CI 指南](CI_ZH.md)
 
-ESP-IDF 工作流会为全部 39 个矩阵通道各生成一个临时、可烧录的诊断包。它使用该通道实际
-生成的 `flasher_args.json`；绝不替代 [`firmware/`](../firmware/) 中不可变的出厂镜像。
+ESP-IDF 工作流会为当前 39 个矩阵通道各生成一个临时可烧录诊断包。它们来自各通道的
+`flasher_args.json`，绝不替代 [`firmware/`](../firmware/) 中不可变的出厂镜像。产物保留
+七天后过期。
 
-## 前提和选择
+## 来源和认证
 
-请使用干净、非 detached 的本地分支，并确保恰有一个已打开、非草稿的 Pull Request，且其
-头提交与完整本地 SHA 一致。工具只接受该精确 SHA 上成功的 `esp-idf-examples.yml` 运行，
-并且只下载所选通道的精确产物名称。它会验证 ZIP 仅含一个清单，确认身份字段、校验和、
-文件大小和偏移与所选通道一致、范围不重叠且全部位于 32 MiB 内。
+共享 Python 核心从当前检出仓库的 CI 发现矩阵推导产物目录。它从 `origin` 解析 GitHub
+仓库，要求干净且非 detached 的分支和完整本地 HEAD SHA，然后只检查该分支及工作流最新的
+运行。该运行必须在精确 HEAD 上完成并成功；显式提供的运行 ID 也必须匹配相同分支、工作流
+和 SHA，不会回退到旧的绿色运行。
 
-在 Windows 上运行：
+前提是 Git、Python 3（Windows 可使用 `python` 或 `py -3`）以及已认证的 `gh` 或
+`GH_TOKEN`/`GITHUB_TOKEN`。本工具刻意不支持匿名下载。
+它会显示仓库、分支、HEAD SHA、运行 ID 和运行 URL。在列出或下载前，必须确认一个成功预检、
+39 个预期构建全部成功，以及恰好 39 个非空、未过期的预期产物。
+
+## 命令
+
+Windows CMD 和 PowerShell 使用同一核心：
 
 ```text
-Flash-CI-Firmware.cmd -Port COMx
+Flash-CI-Firmware.cmd -PreflightOnly -Artifact firmware-esp-idf-01-howtocreateproject-v5.5.5-default
+powershell -File scripts/Flash-CI-Firmware.ps1 -List
+powershell -File scripts/Flash-CI-Firmware.ps1 -Port COMx
 ```
 
-`-ListOnly` 会列出全部 39 个通道，不访问 GitHub 或硬件。`-SelfTest` 只运行本地安全
-检查。若不提供 `-Port`，仅当恰有一个即插即用显示名称同时包含 `CH343` 与 `COM` 时工具
-才会自动填写；否则请明确传入 `-Port COMx`。
+Linux 和其他 POSIX 系统同样使用该核心：
 
-## 引导式实板测试
+```text
+sh Flash-CI-Firmware.sh list
+sh Flash-CI-Firmware.sh preflight --artifact firmware-esp-idf-01-howtocreateproject-v5.5.5-default
+sh Flash-CI-Firmware.sh flash --artifact firmware-esp-idf-01-howtocreateproject-v5.5.5-default --port /dev/ttyUSB0
+```
 
-工具使用 `esp32p4`、921600 波特率和清单导出的写入参数。只有 esptool 成功退出且输出
-`Hash of data verified` 时，通道才视为已烧录。随后必须在实际测试开发板后显式确认手工
-PASS，才可进入下一个通道。进度按最终 SHA 保存，因此新的 SHA 会开始新的测试序列。
+`list` 会在线校验完整的当前 HEAD 运行后，列出可自由选择的固件。`preflight` 将一个明确选择
+的产物下载到已忽略的 `ci-firmware/` 并校验，绝不访问串口或启动 esptool。`flash` 每次调用
+只允许烧录一个明确选择的产物；可显式提供产物和端口，或从编号的固件与串口列表选择。可选的
+`pyserial` 会改进端口发现，显式端口始终可用。兼容别名 `-SelfTest` 和 `-ListOnly` 保持为离线
+目录/安全检查；`-PreflightOnly` 执行在线预检。
+每一次预检/烧录验证都使用新的已忽略 `ci-firmware/` 目录，因此重复检查不会复用旧解压内容。
 
-不得使用此流程烧录、替换、推断偏移或验证仓库中的出厂/恢复固件。出厂固件有独立的
-所有权、发布证据和恢复说明。
+## 安全边界
+
+烧录前会验证 ZIP 路径、链接/特殊条目、重复路径、清单、身份、哈希、大小、偏移、重叠、
+32 MiB 限制、目标芯片、波特率和 esptool 参数。只会把清单派生的偏移和文件传给
+`python -m esptool --chip esp32p4`；擦除操作和对芯片、端口、波特率或写入模式的覆盖都会被
+拒绝。只有操作者输入要求的精确确认文本后才会开始烧录，且仅当 esptool 返回零并输出
+`Hash of data verified` 时才算成功。
+
+这只能证明字节已写入，不能证明显示、触摸、音频、网络或其他硬件在环行为。请手工测试
+这些功能。不得用此流程烧录、替换、推断偏移或验证仓库中的出厂/恢复固件；其发布和恢复
+流程具有独立所有权。

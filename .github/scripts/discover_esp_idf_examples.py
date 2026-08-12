@@ -29,7 +29,9 @@ GLOBAL_BUILD_PATTERNS = (
     "config/ci/**",
     "releases/**",
     "Flash-CI-Firmware.cmd",
+    "Flash-CI-Firmware.sh",
     "scripts/Flash-CI-Firmware.ps1",
+    "scripts/ci_firmware.py",
 )
 DOCUMENTATION_PATTERNS = (
     "*.md",

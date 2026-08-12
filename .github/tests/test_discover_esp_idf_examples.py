@@ -52,9 +52,11 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_global_ci_input_selects_all(self) -> None:
         known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
-        route = discover.classify_paths(["config/ci/rgb888.defaults"], known)
-        self.assertEqual(route.kind, "global")
-        self.assertEqual(route.selected, tuple(sorted(known)))
+        for path in ("config/ci/rgb888.defaults", "scripts/ci_firmware.py", "Flash-CI-Firmware.sh", ".github/tests/test_ci_firmware.py"):
+            with self.subTest(path=path):
+                route = discover.classify_paths([path], known)
+                self.assertEqual(route.kind, "global")
+                self.assertEqual(route.selected, tuple(sorted(known)))
 
     def test_unknown_path_selects_all_conservatively(self) -> None:
         known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}

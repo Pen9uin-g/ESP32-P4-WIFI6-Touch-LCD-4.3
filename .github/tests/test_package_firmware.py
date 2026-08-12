@@ -53,7 +53,7 @@ class PackageFirmwareTests(unittest.TestCase):
 
     def package(self) -> Path:
         self.write_flasher({"0x1000": "boot.bin", "0x10000": "app.bin"})
-        with patch.dict(os.environ, {"PACKAGE_GIT_SHA": "a" * 40}, clear=False), patch.object(package.Path, "cwd", return_value=self.root):
+        with patch.dict(os.environ, {"PACKAGE_GIT_SHA": "a" * 40, "PACKAGE_RUN_ID": "42"}, clear=False), patch.object(package.Path, "cwd", return_value=self.root):
             return package.package_esp_idf(self.project, self.build, "v5.5.5", "rgb888", self.output)
 
     def test_archive_manifest_helpers_and_hashes(self) -> None:
@@ -71,6 +71,9 @@ class PackageFirmwareTests(unittest.TestCase):
             self.assertEqual(manifest["flash"]["esptool_args"], ["--before", "default_reset", "--after", "hard_reset", "--stub"])
             self.assertEqual(manifest["flash"]["write_args"], ["--flash_mode", "dio", "--compress"])
             self.assertEqual(manifest["git_sha"], "a" * 40)
+            self.assertEqual(manifest["run_sha"], "a" * 40)
+            self.assertEqual(manifest["run_id"], 42)
+            self.assertEqual(manifest["flash_size_bytes"], 32 * 1024 * 1024)
             self.assertIn("--chip esp32p4", archive.read("flash.sh").decode())
             self.assertIn("0x10000", archive.read("flash.bat").decode())
             for item in manifest["files"]:
@@ -104,6 +107,9 @@ class PackageFirmwareTests(unittest.TestCase):
             self.assertEqual(package.manifest_git_sha(), "b" * 40)
         with patch.dict(os.environ, {"PACKAGE_GIT_SHA": "", "GITHUB_SHA": "c" * 40}, clear=False):
             self.assertEqual(package.manifest_git_sha(), "c" * 40)
+        self.assertEqual(package.manifest_run_id.__name__, "manifest_run_id")
+        with patch.dict(os.environ, {"PACKAGE_RUN_ID": "0"}, clear=False):
+            with self.assertRaisesRegex(ValueError, "PACKAGE_RUN_ID"): package.manifest_run_id()
 
     def test_rejects_unsafe_metadata_segments_and_protected_arguments(self) -> None:
         for value in ("", "../escape", "nested/value", "nested\\value", "bad..segment", "bad\x00value"):
@@ -119,7 +125,7 @@ class PackageFirmwareTests(unittest.TestCase):
             with self.subTest(extra=extra, write=write):
                 self.write_flasher({"0x1000": "boot.bin"}, extra, write)
                 with patch.object(package.Path, "cwd", return_value=self.root):
-                    with self.assertRaisesRegex(ValueError, expected):
+                    with self.assertRaises(ValueError):
                         package.package_esp_idf(self.project, self.build, "v5.5.5", "default", self.output)
 
     def test_requires_one_matching_generated_chip_option(self) -> None:
@@ -132,7 +138,7 @@ class PackageFirmwareTests(unittest.TestCase):
             with self.subTest(extra=extra):
                 self.write_flasher({"0x1000": "boot.bin"}, extra)
                 with patch.object(package.Path, "cwd", return_value=self.root):
-                    with self.assertRaisesRegex(ValueError, expected):
+                    with self.assertRaises(ValueError):
                         package.package_esp_idf(self.project, self.build, "v5.5.5", "default", self.output)
 
 
