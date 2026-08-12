@@ -90,6 +90,9 @@ ESP-IDF 示例固件。
 会触发完整矩阵，差异为空或无法读取时则直接失败。路由与证据边界详见
 [CI 指南](docs/CI_ZH.md)。
 
+成功的示例 CI 通道还会上传绑定到对应工程、ESP-IDF 版本和变体的可烧录包。详见
+[CI 固件产物](docs/CI_FIRMWARE_ZH.md)。
+
 ## 🗂️ 仓库结构
 
 | 路径 | 用途 |
@@ -110,6 +113,7 @@ ESP-IDF 示例固件。
 - [ESP-IDF 示例](examples/esp-idf/)
 - [仓库指南](docs/README_ZH.md)
 - [持续集成](docs/CI_ZH.md)
+- [CI 固件产物](docs/CI_FIRMWARE_ZH.md)
 - [组件边界](docs/COMPONENTS_ZH.md)
 - [硬件审计](docs/HARDWARE_ZH.md)
 - [English README](README.md)

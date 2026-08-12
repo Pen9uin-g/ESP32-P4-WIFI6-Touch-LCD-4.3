@@ -98,6 +98,9 @@ release review but are never treated as example sources. Unknown paths trigger
 the complete matrix, while an empty or unreadable diff fails closed. See the
 [CI guide](docs/CI.md) for routing and evidence boundaries.
 
+Successful example-CI lanes also upload a SHA-bound flash package for their
+specific project, ESP-IDF version, and variant. See [CI firmware artifacts](docs/CI_FIRMWARE.md).
+
 ## 🗂️ Repository Layout
 
 | Path | Purpose |
@@ -118,6 +121,7 @@ the complete matrix, while an empty or unreadable diff fails closed. See the
 - [ESP-IDF Examples](examples/esp-idf/)
 - [Repository Guide](docs/README.md)
 - [Continuous Integration](docs/CI.md)
+- [CI Firmware Artifacts](docs/CI_FIRMWARE.md)
 - [Component Boundaries](docs/COMPONENTS.md)
 - [Hardware Audit](docs/HARDWARE.md)
 - [中文 README](README_ZH.md)

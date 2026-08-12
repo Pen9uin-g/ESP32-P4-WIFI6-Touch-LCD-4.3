@@ -45,6 +45,15 @@ IDF build graphs can still compile its unlinked target. After top-level
 UAC target a private TinyUSB audio definition. It does not enable product
 descriptors or app audio.
 
+## CI firmware artifacts
+
+After each successful build lane, Actions packages the build's generated
+`flasher_args.json` and uploads one ZIP named for its project, ESP-IDF version,
+and variant. The package is a diagnostic example-CI artifact, not a release.
+It is tied to the pull-request head SHA (or push SHA), contains checksums and
+manifest-derived offsets, and is retained only for a limited period. See
+[CI firmware artifacts](CI_FIRMWARE.md) for the guarded local test flow.
+
 ## Evidence boundary
 
 A green workflow proves that the selected source and configuration resolved its
@@ -55,7 +64,7 @@ dependencies and compiled in the official ESP-IDF CI container for target
 - successful flashing, boot, peripheral timing, radio behavior, or long-run
   stability;
 - camera, display, audio, USB, storage, or touch behavior on physical hardware;
-- release packaging, offsets, or upgrade compatibility.
+- factory release packaging, offsets, or upgrade compatibility.
 
 Those claims require separate hardware or release evidence tied to the exact
 commit and board revision.

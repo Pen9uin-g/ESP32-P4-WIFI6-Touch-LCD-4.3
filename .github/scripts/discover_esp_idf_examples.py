@@ -12,6 +12,7 @@ import argparse
 import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -26,6 +27,9 @@ GLOBAL_BUILD_PATTERNS = (
     ".github/scripts/check_repository.py",
     ".github/tests/**",
     "config/ci/**",
+    "releases/**",
+    "Flash-CI-Firmware.cmd",
+    "scripts/Flash-CI-Firmware.ps1",
 )
 DOCUMENTATION_PATTERNS = (
     "*.md",
@@ -223,12 +227,14 @@ def build_matrix(selected: list[str] | tuple[str, ...]) -> dict[str, list[dict[s
     for example in selected:
         for idf_version in DEFAULT_IDF_VERSIONS:
             for variant, sdkconfig_defaults in variants_for_example(example, idf_version):
+                slug = re.sub(r"[^a-z0-9]+", "-", PurePosixPath(example).name.lower()).strip("-")
                 include.append(
                     {
                         "example": example,
                         "idf_version": idf_version,
                         "variant": variant,
                         "sdkconfig_defaults": sdkconfig_defaults,
+                        "artifact_name": f"firmware-esp-idf-{slug}-{idf_version}-{variant}",
                     }
                 )
     return {"include": include}

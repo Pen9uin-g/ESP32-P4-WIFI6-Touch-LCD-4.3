@@ -21,6 +21,7 @@ REQUIRED_PAIRS = (
     ("SUPPORT.md", "SUPPORT_ZH.md"),
     ("docs/README.md", "docs/README_ZH.md"),
     ("docs/CI.md", "docs/CI_ZH.md"),
+    ("docs/CI_FIRMWARE.md", "docs/CI_FIRMWARE_ZH.md"),
     ("docs/COMPONENTS.md", "docs/COMPONENTS_ZH.md"),
     ("docs/HARDWARE.md", "docs/HARDWARE_ZH.md"),
     (
@@ -56,6 +57,32 @@ REQUIRED_HOMEPAGE_COMPONENTS = {
 REQUIRED_HOMEPAGE_QUICK_LINKS = {"product", "documentation", "firmware", "esp_idf"}
 REQUIRED_HOMEPAGE_BADGES = {"build", "license"}
 REQUIRED_HOMEPAGE_H2_ICONS = ["✨", "🖥️", "📦", "🧪", "🛠️", "🗂️", "📚", "🤝", "📄"]
+BSP_COMPONENT = "waveshare/esp32_p4_wifi6_touch_lcd_4_3"
+BSP_PIN_FIELDS = {
+    "git": "https://github.com/waveshareteam/Waveshare-ESP32-components.git",
+    "path": "bsp/esp32_p4_wifi6_touch_lcd_4_3",
+    "version": "ac94f5da7c0e44963828ab970337e89d23e04330",
+}
+BSP_BASE_COMPONENT_DIRS = (
+    "examples/esp-idf/07_Displaycolorbar/components/esp32_p4_wifi6_touch_lcd_4_3",
+    "examples/esp-idf/08_lvgl_demo_v9/components/esp32_p4_wifi6_touch_lcd_4_3",
+    "examples/esp-idf/09_video_lcd_display/components/esp32_p4_wifi6_touch_lcd_4_3",
+    "examples/esp-idf/10_mp4_player/components/esp32_p4_wifi6_touch_lcd_4_3",
+    "examples/esp-idf/11_esp_brookesia_phone/components/esp32_p4_wifi6_touch_lcd_4_3",
+    "examples/esp-idf/12_usb_extend_screen/components/esp32_p4_wifi6_touch_lcd_4_3",
+)
+BSP_EXTRA_COMPONENT_DIRS = (
+    "examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra",
+    "examples/esp-idf/12_usb_extend_screen/components/bsp_extra",
+)
+BSP_MANIFESTS = (
+    "examples/esp-idf/07_Displaycolorbar/main/idf_component.yml",
+    "examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra/idf_component.yml",
+    "examples/esp-idf/09_video_lcd_display/main/idf_component.yml",
+    "examples/esp-idf/10_mp4_player/main/idf_component.yml",
+    "examples/esp-idf/11_esp_brookesia_phone/main/idf_component.yml",
+    "examples/esp-idf/12_usb_extend_screen/components/bsp_extra/idf_component.yml",
+)
 
 
 def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
@@ -67,6 +94,55 @@ def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
         for path in root.iterdir()
         if path.is_dir() and (path / "CMakeLists.txt").is_file() and (path / "main").is_dir()
     )
+
+
+def pinned_bsp_dependency_errors(manifest: str) -> list[str]:
+    """Validate the dependency-manager subset used by the reviewed BSP source pin."""
+    key_pattern = re.compile(rf"(?m)^  {re.escape(BSP_COMPONENT)}:[ \t]*$")
+    matches = list(key_pattern.finditer(manifest))
+    if len(matches) != 1:
+        return [f"expected exactly one {BSP_COMPONENT} dependency mapping"]
+
+    fields: dict[str, str] = {}
+    errors: list[str] = []
+    for line in manifest[matches[0].end() :].lstrip("\r\n").splitlines():
+        if not line.startswith("    "):
+            break
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if ":" not in stripped:
+            errors.append("BSP dependency mapping contains an invalid field")
+            continue
+        field, value = stripped.split(":", 1)
+        field = field.strip()
+        if field in fields:
+            errors.append(f"BSP dependency mapping repeats {field}")
+        fields[field] = value.strip().strip("\"'")
+
+    if fields != BSP_PIN_FIELDS:
+        errors.append("BSP dependency must use the exact reviewed git, path, and version pin")
+    return errors
+
+
+def bsp_pin_policy_errors(repo_root: Path = REPO_ROOT) -> list[str]:
+    """Keep local base BSP copies removed while retaining the two product extensions."""
+    errors: list[str] = []
+    for relative in BSP_BASE_COMPONENT_DIRS:
+        if (repo_root / relative).exists():
+            errors.append(f"{relative}: local base BSP path must be absent")
+    for relative in BSP_EXTRA_COMPONENT_DIRS:
+        if not (repo_root / relative).is_dir():
+            errors.append(f"{relative}: required product bsp_extra tree is missing")
+    for relative in BSP_MANIFESTS:
+        path = repo_root / relative
+        try:
+            manifest = path.read_text(encoding="utf-8")
+        except OSError as error:
+            errors.append(f"{relative}: cannot read BSP manifest: {error}")
+            continue
+        errors.extend(f"{relative}: {error}" for error in pinned_bsp_dependency_errors(manifest))
+    return errors
 
 
 def markdown_targets(text: str) -> list[str]:
@@ -258,6 +334,8 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     for relative in REQUIRED_CI_DEFAULTS:
         if not (repo_root / relative).is_file():
             errors.append(f"missing CI sdkconfig overlay: {relative}")
+
+    errors.extend(bsp_pin_policy_errors(repo_root))
 
     audit_policy = repo_root / ".github" / "markdown-audit.json"
     try:

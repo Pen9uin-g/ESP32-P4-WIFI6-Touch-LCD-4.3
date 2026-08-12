@@ -10,10 +10,10 @@ sources, managed dependencies, and one prebuilt component. Treating every
 | --- | --- | --- |
 | `05_sdmmc/components/sd_card` | Example-local source | Provides the SD test glue used by example 05; keep it with that example |
 | `08_lvgl_demo_v9/components/bsp_extra` and `12_usb_extend_screen/components/bsp_extra` | Product application extension | Exposes board-specific codec, player, and file APIs; do not replace with the base BSP alone |
-| Local `esp32_p4_wifi6_touch_lcd_4_3` copies in examples 07–12 | Product BSP snapshot | Local resolution wins over a same-named managed dependency; retain until a registry release is proven API-, Kconfig-, and hardware-equivalent |
+| Base `esp32_p4_wifi6_touch_lcd_4_3` dependency in examples 07–12 | Pinned upstream source | Every base-BSP manifest resolves the reviewed upstream commit `ac94f5da7c0e44963828ab970337e89d23e04330` from [upstream PR #191](https://github.com/waveshareteam/Waveshare-ESP32-components/pull/191), rather than a local copy or registry release |
 | Example 11 Brookesia components | Vendored/local integration | `brookesia_core` and the Squareline application are intentionally resolved by local paths; nested test apps are not product CI projects |
 | `10_mp4_player/components/esp_extractor` | Prebuilt vendor component | Target-specific static libraries are required by the player; source and complete provenance are not present here |
-| Dependencies declared in `idf_component.yml` | Managed dependency | Actions resolves them from the ESP Component Registry; generated `managed_components/` trees are not repository source |
+| Dependencies declared in `idf_component.yml` | Managed or Git dependency | Actions resolves each declared Registry or Git source; generated `managed_components/` trees are not repository source |
 
 Example 10 constrains `espressif/esp_audio_codec` to versions from 2.3 up to,
 but not including, 2.6. Version 2.6 and newer require ESP32-P4 silicon revision
@@ -38,11 +38,17 @@ managed component targets, a `TARGET` guard applies a private TinyUSB audio
 definition only to that UAC target; the product descriptor and app remain
 disabled.
 
-The exact registry artifact corresponding to the local 4.3-inch BSP has not
-been established as equivalent to this snapshot. A future migration must pin a
-candidate, compare public headers and Kconfig, preserve the board's 480 × 800
-ST7701/GT911/audio/SDIO behavior, and pass the complete Actions matrix before
-the local copies are removed.
+The two `bsp_extra` trees remain local product application extensions. They are
+not substitutes for the base BSP and are intentionally retained while the base
+BSP resolves from the pinned upstream source. The pin is an upstream review
+commit, not an ESP Component Registry release; no registry release is used for
+this base BSP yet.
+
+After upstream review, resolve and compile the affected examples, then complete
+the post-HIL sequence on product hardware: boot the board, verify the 480 × 800
+display and GT911 touch, exercise audio and SDIO, and run the applicable USB or
+video path. Record that hardware evidence separately from Actions results
+before advancing the pin or proposing a registry release.
 
 Do not replace or redistribute the `esp_extractor` archives under a new license
 assumption. Any provenance or licensing change needs source-origin and rights

@@ -38,6 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Test repository CI helpers
         run: python .github/tests/run_tests.py
@@ -112,6 +113,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Build default configuration
         if: matrix.sdkconfig_defaults == ''
@@ -129,3 +132,23 @@ jobs:
           target: esp32p4
           path: ${{ matrix.example }}
           command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;${{ matrix.sdkconfig_defaults }}" build
+
+      - name: Package flashable CI artifact
+        env:
+          PACKAGE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python releases/package_firmware.py \
+            --project "${{ matrix.example }}" \
+            --build-dir "${{ matrix.example }}/build" \
+            --framework-version "${{ matrix.idf_version }}" \
+            --variant "${{ matrix.variant }}" \
+            --output-dir ci-firmware
+
+      - name: Upload flashable CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ci-firmware/${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+          retention-days: 7

@@ -94,6 +94,8 @@ class DiscoveryTests(unittest.TestCase):
         ]
         matrix = discover.build_matrix(examples)["include"]
         self.assertEqual(len(matrix), 39)
+        self.assertTrue(all(item["artifact_name"].startswith("firmware-esp-idf-") for item in matrix))
+        self.assertEqual(len({item["artifact_name"] for item in matrix}), 39)
         self.assertEqual(sum(item["variant"] == "default" for item in matrix), 24)
         self.assertEqual(sum(item["variant"] == "rgb888" for item in matrix), 12)
         self.assertEqual(sum(item["variant"] == "ai" for item in matrix), 1)

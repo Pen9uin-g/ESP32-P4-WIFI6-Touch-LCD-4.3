@@ -4,6 +4,8 @@
 
 - [Continuous integration](CI.md): change routing, tested ESP-IDF versions,
   conditional configurations, and the compile-only evidence boundary.
+- [CI firmware artifacts](CI_FIRMWARE.md): guarded download, verification, and
+  manual-board-test flow for example-CI packages.
 - [Component boundaries](COMPONENTS.md): local, vendored, prebuilt, and managed
   dependency ownership rules.
 - [Hardware audit](HARDWARE.md): schematic-backed interfaces, pin mappings, and

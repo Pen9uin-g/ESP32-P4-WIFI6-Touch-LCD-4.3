@@ -3,6 +3,7 @@
 [English](README.md)
 
 - [持续集成](CI_ZH.md)：变更路由、验证的 ESP-IDF 版本、条件配置及仅编译验证边界。
+- [CI 固件产物](CI_FIRMWARE_ZH.md)：示例 CI 包的受保护下载、校验与实板手工测试流程。
 - [组件边界](COMPONENTS_ZH.md)：本地、内嵌、预编译及托管依赖的所有权规则。
 - [硬件审计](HARDWARE_ZH.md)：基于原理图核对的接口、引脚映射及仍需实板确认的项目。
 - [贡献指南](../CONTRIBUTING_ZH.md)：修改范围、验证方法和 Pull Request 要求。

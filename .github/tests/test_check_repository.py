@@ -16,6 +16,47 @@ SPEC.loader.exec_module(checks)
 
 
 class RepositoryCheckTests(unittest.TestCase):
+    def test_reviewed_bsp_pin_requires_exact_mapping(self) -> None:
+        manifest = (
+            "dependencies:\n"
+            f"  {checks.BSP_COMPONENT}:\n"
+            f"    git: {checks.BSP_PIN_FIELDS['git']}\n"
+            f"    path: {checks.BSP_PIN_FIELDS['path']}\n"
+            f"    version: {checks.BSP_PIN_FIELDS['version']}\n"
+        )
+        self.assertEqual(checks.pinned_bsp_dependency_errors(manifest), [])
+        self.assertTrue(
+            checks.pinned_bsp_dependency_errors(
+                manifest.replace(checks.BSP_PIN_FIELDS["version"], "deadbeef")
+            )
+        )
+        self.assertTrue(
+            checks.pinned_bsp_dependency_errors(
+                manifest.replace(f"  {checks.BSP_COMPONENT}:\n", f"  {checks.BSP_COMPONENT}: \"*\"\n")
+            )
+        )
+
+    def test_bsp_policy_removes_base_copy_and_retains_extensions(self) -> None:
+        manifest = (
+            "dependencies:\n"
+            f"  {checks.BSP_COMPONENT}:\n"
+            f"    git: {checks.BSP_PIN_FIELDS['git']}\n"
+            f"    path: {checks.BSP_PIN_FIELDS['path']}\n"
+            f"    version: {checks.BSP_PIN_FIELDS['version']}\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in checks.BSP_EXTRA_COMPONENT_DIRS:
+                (root / relative).mkdir(parents=True)
+            for relative in checks.BSP_MANIFESTS:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(manifest, encoding="utf-8")
+            self.assertEqual(checks.bsp_pin_policy_errors(root), [])
+
+            (root / checks.BSP_BASE_COMPONENT_DIRS[0]).mkdir(parents=True)
+            errors = checks.bsp_pin_policy_errors(root)
+            self.assertTrue(any("local base BSP path must be absent" in error for error in errors))
     def test_usb_audio_dependency_boundary(self) -> None:
         manifest = (
             'espressif/usb_device_uac:\n'

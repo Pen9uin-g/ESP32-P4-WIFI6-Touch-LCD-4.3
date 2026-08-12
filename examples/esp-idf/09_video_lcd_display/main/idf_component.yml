@@ -6,4 +6,7 @@ dependencies:
   esp_video:
     version: "~2.0"
     public: true
-  waveshare/esp32_p4_wifi6_touch_lcd_4_3: "*"
+  waveshare/esp32_p4_wifi6_touch_lcd_4_3:
+    git: https://github.com/waveshareteam/Waveshare-ESP32-components.git
+    path: bsp/esp32_p4_wifi6_touch_lcd_4_3
+    version: ac94f5da7c0e44963828ab970337e89d23e04330
