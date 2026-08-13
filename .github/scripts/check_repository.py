@@ -43,6 +43,9 @@ REQUIRED_CI_DEFAULTS = (
     "config/ci/brookesia_ai.defaults",
     "config/ci/usb_minimal.defaults",
 )
+REQUIRED_CI_HELPERS = (
+    ".github/scripts/audit_markdown.py",
+)
 REQUIRED_HOMEPAGE_COMPONENTS = {
     "centered_header",
     "html_h1",
@@ -334,6 +337,10 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     for relative in REQUIRED_CI_DEFAULTS:
         if not (repo_root / relative).is_file():
             errors.append(f"missing CI sdkconfig overlay: {relative}")
+
+    for relative in REQUIRED_CI_HELPERS:
+        if not (repo_root / relative).is_file():
+            errors.append(f"missing CI helper: {relative}")
 
     errors.extend(bsp_pin_policy_errors(repo_root))
 

@@ -24,6 +24,7 @@ DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
 GLOBAL_BUILD_PATTERNS = (
     ".github/workflows/esp-idf-examples.yml",
     ".github/scripts/discover_esp_idf_examples.py",
+    ".github/scripts/audit_markdown.py",
     ".github/scripts/check_repository.py",
     ".github/tests/**",
     "config/ci/**",
@@ -158,17 +159,18 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
 
     for raw_path in paths:
         path = normalize_path(raw_path)
-        example = example_for_path(path, known_examples)
-        if example:
-            selected.add(example)
-        elif matches_any(path, GLOBAL_BUILD_PATTERNS):
+        if matches_any(path, GLOBAL_BUILD_PATTERNS):
             global_build = True
         elif matches_any(path, FIRMWARE_PATTERNS):
             firmware = True
         elif matches_any(path, DOCUMENTATION_PATTERNS):
             docs = True
         else:
-            unknown.add(path)
+            example = example_for_path(path, known_examples)
+            if example:
+                selected.add(example)
+            else:
+                unknown.add(path)
 
     if global_build or unknown:
         selected = set(known_examples)

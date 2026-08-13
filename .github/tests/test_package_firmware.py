@@ -79,6 +79,37 @@ class PackageFirmwareTests(unittest.TestCase):
             for item in manifest["files"]:
                 self.assertEqual(package.sha256(Path(self.build / Path(item["archive_path"]).name)), item["sha256"])
 
+    def test_idf_v6_hyphenated_reset_values_are_preserved(self) -> None:
+        self.write_flasher(
+            {"0x1000": "boot.bin"},
+            {"before": "default-reset", "after": "hard-reset", "stub": False, "chip": "esp32p4"},
+        )
+        with patch.dict(os.environ, {"PACKAGE_GIT_SHA": "a" * 40, "PACKAGE_RUN_ID": "42"}, clear=False), patch.object(package.Path, "cwd", return_value=self.root):
+            output = package.package_esp_idf(self.project, self.build, "v6.0.2", "default", self.output)
+        with zipfile.ZipFile(output) as archive:
+            manifest = json.loads(archive.read("manifest.json"))
+        self.assertEqual(manifest["flash"]["esptool_args"], ["--before", "default-reset", "--after", "hard-reset"])
+
+    def test_invalid_reset_values_are_rejected(self) -> None:
+        for extra in (
+            {"before": "soft-reset", "after": "hard_reset", "stub": False, "chip": "esp32p4"},
+            {"before": "default_reset", "after": "soft-reset", "stub": False, "chip": "esp32p4"},
+        ):
+            with self.subTest(extra=extra):
+                self.write_flasher({"0x1000": "boot.bin"}, extra)
+                with patch.object(package.Path, "cwd", return_value=self.root):
+                    with self.assertRaisesRegex(ValueError, "unsupported"):
+                        package.package_esp_idf(self.project, self.build, "v6.0.2", "default", self.output)
+
+    def test_idf_v5_rejects_hyphenated_reset_values(self) -> None:
+        self.write_flasher(
+            {"0x1000": "boot.bin"},
+            {"before": "default-reset", "after": "hard-reset", "stub": False, "chip": "esp32p4"},
+        )
+        with patch.object(package.Path, "cwd", return_value=self.root):
+            with self.assertRaisesRegex(ValueError, "unsupported"):
+                package.package_esp_idf(self.project, self.build, "v5.5.5", "default", self.output)
+
     def test_rejects_traversal_and_outside_project(self) -> None:
         outside = self.root / "outside.bin"
         outside.write_bytes(b"outside")

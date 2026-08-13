@@ -51,6 +51,23 @@ jobs:
       - name: Audit repository metadata and local links
         run: python .github/scripts/check_repository.py
 
+      - name: Audit Markdown and public text
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$PUSH_BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            python .github/scripts/audit_markdown.py . --all --config .github/markdown-audit.json
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            python .github/scripts/audit_markdown.py . --base "$PR_BASE_SHA" --config .github/markdown-audit.json
+          else
+            python .github/scripts/audit_markdown.py . --base "$PUSH_BEFORE_SHA" --config .github/markdown-audit.json
+          fi
+
       - name: Route changed ESP-IDF examples
         id: examples
         shell: bash

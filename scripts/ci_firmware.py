@@ -337,7 +337,10 @@ def digest(path: Path) -> str:
 def validate_args(values: Any, field: str) -> list[str]:
     if not isinstance(values, list) or not all(isinstance(item, str) and item for item in values):
         raise SafetyError(f"manifest {field} must be an array of non-empty strings")
-    allowed_pairs = {"--before": {"default_reset", "no_reset"}, "--after": {"hard_reset", "no_reset"}} if field == "flash.esptool_args" else {
+    allowed_pairs = {
+        "--before": {"default_reset", "no_reset", "default-reset", "no-reset"},
+        "--after": {"hard_reset", "no_reset", "hard-reset", "no-reset"},
+    } if field == "flash.esptool_args" else {
         "--flash_mode": {"qio", "qout", "dio", "dout", "keep"}, "--flash_freq": {"keep", "20m", "26m", "40m", "80m"},
         "--flash_size": {"keep", "detect", "2MB", "4MB", "8MB", "16MB", "32MB"}}
     result: list[str] = []

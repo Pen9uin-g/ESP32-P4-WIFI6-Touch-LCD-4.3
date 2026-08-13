@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -34,14 +37,33 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(route.kind, "docs")
         self.assertEqual(route.selected, ())
 
+    def test_markdown_is_documentation_before_example_ownership(self) -> None:
+        known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
+        for path in (
+            "README.md",
+            "examples/esp-idf/01_demo/README.md",
+            "examples/esp-idf/01_demo/components/bundled/README.md",
+        ):
+            with self.subTest(path=path):
+                route = discover.classify_paths([path], known)
+                self.assertEqual(route.kind, "docs")
+                self.assertTrue(route.docs_only)
+                self.assertEqual(route.selected, ())
+
     def test_firmware_is_reported_but_not_built(self) -> None:
-        route = discover.classify_paths(
-            ["firmware/factory.bin"], {"examples/esp-idf/01_demo"}
-        )
-        self.assertEqual(route.kind, "firmware")
-        self.assertTrue(route.firmware_changes)
-        self.assertTrue(route.release_review)
-        self.assertEqual(route.selected, ())
+        for path in (
+            "firmware/README.md",
+            "firmware/main/app.c",
+            "firmware/factory.bin",
+            "firmware/release.zip",
+        ):
+            with self.subTest(path=path):
+                route = discover.classify_paths([path], {"examples/esp-idf/01_demo"})
+                self.assertEqual(route.kind, "firmware")
+                self.assertTrue(route.firmware_changes)
+                self.assertTrue(route.release_review)
+                self.assertFalse(route.docs_only)
+                self.assertEqual(route.selected, ())
 
     def test_direct_example_selects_only_its_parent(self) -> None:
         known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
@@ -50,9 +72,17 @@ class DiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(route.selected, ("examples/esp-idf/02_demo",))
 
+    def test_mixed_docs_and_source_selects_only_the_source_example(self) -> None:
+        known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
+        route = discover.classify_paths(
+            ["examples/esp-idf/01_demo/README.md", "examples/esp-idf/02_demo/main/app.c"], known
+        )
+        self.assertEqual(route.selected, ("examples/esp-idf/02_demo",))
+        self.assertFalse(route.docs_only)
+
     def test_global_ci_input_selects_all(self) -> None:
         known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
-        for path in ("config/ci/rgb888.defaults", "scripts/ci_firmware.py", "Flash-CI-Firmware.sh", ".github/tests/test_ci_firmware.py"):
+        for path in ("config/ci/rgb888.defaults", "scripts/ci_firmware.py", "Flash-CI-Firmware.sh", ".github/tests/test_ci_firmware.py", ".github/scripts/audit_markdown.py"):
             with self.subTest(path=path):
                 route = discover.classify_paths([path], known)
                 self.assertEqual(route.kind, "global")
@@ -74,6 +104,52 @@ class DiscoveryTests(unittest.TestCase):
             discover.paths_from_name_status(["R100\told.md\tdocs/new.md"]),
             ["docs/new.md", "old.md"],
         )
+
+    def test_rename_and_delete_keep_their_old_path_impact(self) -> None:
+        known = {"examples/esp-idf/01_demo"}
+        paths = discover.paths_from_name_status([
+            "R100\texamples/esp-idf/01_demo/main/app.c\tdocs/moved.md",
+            "D\texamples/esp-idf/01_demo/main/removed.c",
+        ])
+        route = discover.classify_paths(paths, known)
+        self.assertEqual(route.selected, ("examples/esp-idf/01_demo",))
+
+    def test_cli_base_and_head_route_writes_github_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "examples" / "esp-idf" / "01_demo"
+            (project / "main").mkdir(parents=True)
+            (project / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.16)\n", encoding="utf-8")
+            (project / "main" / "app.c").write_text("void app_main(void) {}\n", encoding="utf-8")
+            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(["git", "config", "user.email", "tests@example.invalid"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Synthetic Tests"], cwd=root, check=True)
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            (project / "main" / "app.c").write_text("void app_main(void) { }\n", encoding="utf-8")
+            subprocess.run(["git", "commit", "-am", "source change"], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+            output = root / "github-output"
+            environment = {**os.environ, "GITHUB_OUTPUT": str(output)}
+            process = subprocess.run(
+                [sys.executable, str(SCRIPT), "--base-ref", base, "--head-ref", head],
+                cwd=root,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual(json.loads(process.stdout), {"include": [
+                {"example": "examples/esp-idf/01_demo", "idf_version": "v5.5.5", "variant": "default", "sdkconfig_defaults": "", "artifact_name": "firmware-esp-idf-01-demo-v5.5.5-default"},
+                {"example": "examples/esp-idf/01_demo", "idf_version": "v6.0.2", "variant": "default", "sdkconfig_defaults": "", "artifact_name": "firmware-esp-idf-01-demo-v6.0.2-default"},
+            ]})
+            values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
+            self.assertEqual(values["route"], "examples")
+            self.assertEqual(values["examples"], "examples/esp-idf/01_demo")
+            self.assertEqual(values["docs_only"], "false")
+            self.assertEqual(values["build_count"], "2")
 
     def test_full_matrix_has_default_and_conditional_lanes(self) -> None:
         self.assertEqual(discover.DEFAULT_IDF_VERSIONS, ("v5.5.5", "v6.0.2"))

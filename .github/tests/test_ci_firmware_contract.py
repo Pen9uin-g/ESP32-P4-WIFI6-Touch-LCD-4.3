@@ -34,6 +34,18 @@ class CiFirmwareContractTests(unittest.TestCase):
         for required in ("esp32p4", "MAX_FLASH_BYTES", "Hash of data verified", "manual-confirmation", "lanes=39", "extract_zip_safely", "source_project", "validate_args", "run_sha"):
             self.assertIn(required, core)
 
+    def test_workflow_runs_the_exact_markdown_audit_contract(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "esp-idf-examples.yml").read_text(encoding="utf-8")
+        for required in (
+            "- name: Audit Markdown and public text",
+            'if [[ "$EVENT_NAME" == "workflow_dispatch" || "$PUSH_BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then',
+            "python .github/scripts/audit_markdown.py . --all --config .github/markdown-audit.json",
+            'python .github/scripts/audit_markdown.py . --base "$PR_BASE_SHA" --config .github/markdown-audit.json',
+            'python .github/scripts/audit_markdown.py . --base "$PUSH_BEFORE_SHA" --config .github/markdown-audit.json',
+            "set -euo pipefail",
+        ):
+            self.assertIn(required, workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

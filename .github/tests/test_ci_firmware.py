@@ -128,6 +128,20 @@ class CiFirmwareTests(unittest.TestCase):
                 lane, head = self._package(root, **change)
                 with self.assertRaises(core.SafetyError): core.validate_manifest(root, lane, head, 42)
 
+    def test_manifest_accepts_both_idf_reset_dialects_and_rejects_invalid_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for esptool_args in (
+                ["--before", "default_reset", "--after", "hard_reset"],
+                ["--before", "default-reset", "--after", "hard-reset"],
+            ):
+                with self.subTest(esptool_args=esptool_args):
+                    lane, head = self._package(root, flash={"baud": core.BAUD, "esptool_args": esptool_args, "write_args": ["--flash_mode", "dio"]})
+                    self.assertEqual(len(core.validate_manifest(root, lane, head, 42)[0]), 1)
+            lane, head = self._package(root, flash={"baud": core.BAUD, "esptool_args": ["--after", "soft-reset"], "write_args": ["--flash_mode", "dio"]})
+            with self.assertRaises(core.SafetyError):
+                core.validate_manifest(root, lane, head, 42)
+
     def test_empty_serial_selection_fails_closed_but_explicit_port_is_not_enumerated(self) -> None:
         with self.assertRaises(core.SafetyError): core.choose("port: ", [])
         self.assertEqual(core.select_serial_port("COM99", []), "COM99")

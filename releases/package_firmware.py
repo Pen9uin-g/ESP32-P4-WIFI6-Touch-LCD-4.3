@@ -134,16 +134,21 @@ def archive_name(path: Path, used: set[str]) -> str:
     return candidate
 
 
-def generated_esptool_args(values: object) -> list[str]:
+def generated_esptool_args(values: object, framework_version: str) -> list[str]:
     if not isinstance(values, dict) or set(values) - {"before", "after", "stub", "chip"}:
         raise ValueError("flasher_args.json extra_esptool_args has unsupported fields")
     if values.get("chip") != CHIP or not isinstance(values.get("stub", False), bool):
         raise ValueError("flasher_args.json must specify esp32p4 and a boolean stub setting")
     result: list[str] = []
-    for name, allowed in (("before", {"default_reset", "no_reset"}), ("after", {"hard_reset", "no_reset"})):
+    idf_v5 = framework_version.startswith("v5.")
+    for name, allowed in (
+        ("before", {"default_reset", "no_reset", "default-reset", "no-reset"}),
+        ("after", {"hard_reset", "no_reset", "hard-reset", "no-reset"}),
+    ):
         value = values.get(name)
         if value is not None:
-            if value not in allowed: raise ValueError(f"unsupported {name} setting")
+            if value not in allowed or (idf_v5 and "-" in value):
+                raise ValueError(f"unsupported {name} setting")
             result.extend((f"--{name}", value))
     if values.get("stub"):
         result.append("--stub")
@@ -204,7 +209,7 @@ def package_esp_idf(project: Path, build_dir: Path, framework_version: str, vari
     flash_files = raw_args.get("flash_files")
     if not isinstance(flash_files, dict) or not flash_files:
         raise ValueError("flasher_args.json must contain a non-empty flash_files object")
-    esptool_args = generated_esptool_args(raw_args.get("extra_esptool_args", {}))
+    esptool_args = generated_esptool_args(raw_args.get("extra_esptool_args", {}), framework_version)
     write_args = generated_write_args(raw_args.get("flash_settings", {}))
     records: list[dict[str, object]] = []
     sources: list[tuple[Path, str]] = []
