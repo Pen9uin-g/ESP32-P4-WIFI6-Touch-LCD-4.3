@@ -18,12 +18,14 @@
 2.6 及以上版本要求 ESP32-P4 芯片 revision 3.0，而本产品仓库内的默认配置有意支持
 更早的 P4 revision。在产品支持的最低硬件版本改变前应保留该上界。
 
-示例 11 的 Brookesia AI 路径会在 ESP-IDF `v5.5.5` 与 `v6.0.2` 下编译；启用 AI 时，
-其条件 manifest 规则会解析一致的 GMF 0.6 依赖集。GMF 0.6 缺少较新的 keep-awake API，
+示例 11 的 Brookesia AI 路径仅在 ESP-IDF `v5.5.5` 下编译；在该版本线上启用 AI 时，
+其条件 manifest 规则会解析一致的 GMF 0.6 依赖集。GMF 0.6.x AI 组件在其 CMake 文件顶层
+调用 `idf_build_set_property`，ESP-IDF v6.0 会在早期的 `component_get_requirements` 阶段
+拒绝该调用，因此 AI 覆盖配置暂不进入 v6 通道。GMF 0.6 还缺少较新的 keep-awake API，
 因此说话计时器和状态流程不会调用该不可用函数。仅启用 AI 的 `brookesia_core` C++ 源码
 会添加 `-fpermissive` 以兼容 GMF 0.6 的 C 头文件；默认及非 AI 配置不会获得该标志。
-今后升级 GMF 时必须保持 API 相互耦合的依赖集一致，并同时验证两个 IDF 版本线，不能
-只推进其中一个组件。
+今后升级 GMF 时必须保持 API 相互耦合的依赖集一致，恢复 v6 AI 通道，并同时验证两个
+IDF 版本线，不能只推进其中一个组件。
 
 示例 12 会下载 `usb_device_uac` 1.2.0，但将其标记为非必需。只有启用 UAC 音频时才
 链接该组件，因此最小 HID/显示配置不会无条件依赖 UAC 构建。较旧 IDF 仍可能编译下载的

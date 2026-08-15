@@ -41,7 +41,7 @@ class CiFirmwareTests(unittest.TestCase):
         for bad in ("https://example.invalid/owner/repository", "https://github.com/owner/repo?x=1", "git@github.com:owner/repo;bad"):
             with self.assertRaises(core.SafetyError): core.parse_github_origin(bad)
 
-    def test_catalog_is_exact_authoritative_42_lane_names(self) -> None:
+    def test_catalog_is_exact_authoritative_41_lane_names(self) -> None:
         names = {lane.artifact for lane in core.load_catalog(ROOT)}
         expected = set()
         examples = ("01_HowToCreateProject", "02_HelloWorld", "03_i2c_tools", "04_wifistation", "05_sdmmc", "06_I2SCodec", "07_Displaycolorbar", "08_lvgl_demo_v9", "09_video_lcd_display", "10_mp4_player", "11_esp_brookesia_phone", "12_usb_extend_screen")
@@ -55,12 +55,11 @@ class CiFirmwareTests(unittest.TestCase):
             "firmware-esp-idf-06-i2scodec-v5.5.5-echo",
             "firmware-esp-idf-06-i2scodec-v6.0.2-echo",
             "firmware-esp-idf-11-esp-brookesia-phone-v5.5.5-ai",
-            "firmware-esp-idf-11-esp-brookesia-phone-v6.0.2-ai",
             "firmware-esp-idf-12-usb-extend-screen-v5.5.5-minimal",
             "firmware-esp-idf-12-usb-extend-screen-v6.0.2-minimal",
         }
         self.assertEqual(names, expected)
-        self.assertEqual(len(names), 42)
+        self.assertEqual(len(names), 41)
 
     def test_auth_prefers_authenticated_gh_then_token_and_never_anonymous(self) -> None:
         self.assertEqual(core.auth_mode(lambda _: "gh", {}, lambda: True), ("gh", None))

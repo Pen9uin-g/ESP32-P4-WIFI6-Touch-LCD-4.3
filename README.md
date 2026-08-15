@@ -87,12 +87,12 @@ on the target board and connected accessories.
 | Surface | Version | Default builds | Conditional builds |
 | --- | --- | ---: | ---: |
 | ESP-IDF | `v5.5.5` | 12 | 9 |
-| ESP-IDF | `v6.0.2` | 12 | 9 |
+| ESP-IDF | `v6.0.2` | 12 | 8 |
 
 The [ESP-IDF examples workflow](.github/workflows/esp-idf-examples.yml) discovers
 the 12 direct first-party projects under `examples/esp-idf/`. A full source run
-contains one preflight job and 42 build jobs: 24 defaults plus audio-echo,
-RGB888, Brookesia-AI, and USB-minimal configurations. Documentation-only changes run the
+contains one preflight job and 41 build jobs: 24 defaults plus audio-echo,
+RGB888, Brookesia-AI (v5.5.5 only), and USB-minimal configurations. Documentation-only changes run the
 preflight without ESP-IDF builds; factory-firmware changes are reported for
 release review but are never treated as example sources. Unknown paths trigger
 the complete matrix, while an empty or unreadable diff fails closed. See the

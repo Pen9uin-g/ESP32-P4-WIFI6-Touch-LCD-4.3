@@ -417,17 +417,17 @@ class DiscoveryTests(unittest.TestCase):
             )
         ]
         matrix = discover.build_matrix(examples)["include"]
-        self.assertEqual(len(matrix), 42)
+        self.assertEqual(len(matrix), 41)
         self.assertTrue(all(item["artifact_name"].startswith("firmware-esp-idf-") for item in matrix))
-        self.assertEqual(len({item["artifact_name"] for item in matrix}), 42)
+        self.assertEqual(len({item["artifact_name"] for item in matrix}), 41)
         self.assertEqual(sum(item["variant"] == "default" for item in matrix), 24)
         self.assertEqual(sum(item["variant"] == "echo" for item in matrix), 2)
         self.assertEqual(sum(item["variant"] == "rgb888" for item in matrix), 12)
-        self.assertEqual(sum(item["variant"] == "ai" for item in matrix), 2)
+        self.assertEqual(sum(item["variant"] == "ai" for item in matrix), 1)
         self.assertEqual(sum(item["variant"] == "minimal" for item in matrix), 2)
         self.assertEqual(
             [item["idf_version"] for item in matrix if item["variant"] == "ai"],
-            ["v5.5.5", "v6.0.2"],
+            ["v5.5.5"],
         )
         self.assertEqual(
             [item["idf_version"] for item in matrix if item["variant"] == "echo"],

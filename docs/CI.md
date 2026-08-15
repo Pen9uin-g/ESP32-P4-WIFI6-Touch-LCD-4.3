@@ -27,19 +27,22 @@ component test applications are not promoted to product examples.
 ## Build matrix
 
 The default matrix compiles all 12 product examples with ESP-IDF `v5.5.5` and
-`v6.0.2`, producing 24 jobs. A full source-impact run also contains 18 focused
+`v6.0.2`, producing 24 jobs. A full source-impact run also contains 17 focused
 jobs:
 
 - 2 ES7210-to-ES8311 echo jobs for example 06, one on each ESP-IDF version;
 - 12 RGB888 jobs for examples 07 through 12 on both ESP-IDF versions;
-- 2 AI-enabled Brookesia jobs for example 11, one on each ESP-IDF version;
+- 1 AI-enabled Brookesia job for example 11 on ESP-IDF `v5.5.5` only;
 - 2 USB-minimal jobs with HID touch and UAC audio disabled for example 12.
 
-That makes 42 ESP-IDF build jobs in a complete matrix. The audio echo overlay
+That makes 41 ESP-IDF build jobs in a complete matrix. The audio echo overlay
 compiles the board's ES7210 microphone and ES8311 speaker path on both supported
-ESP-IDF lines. The Brookesia AI overlay
-compiles the same optional dependency path on both supported ESP-IDF lines;
-the product default keeps AI disabled to bound runtime resources. The overlays in
+ESP-IDF lines. The Brookesia AI overlay compiles the optional AI dependency path
+only on `v5.5.5`: the GMF 0.6.x AI components call `idf_build_set_property` at
+the top level of their CMake files, which ESP-IDF v6.0 rejects during its early
+`component_get_requirements` pass, so the lane stays v5-only until the coherent
+GMF set is upgraded (see [components](COMPONENTS.md)). The product default keeps
+AI disabled to bound runtime resources. The overlays in
 [`config/ci/`](../config/ci/) are appended after each project's
 `sdkconfig.defaults`; they exist only to compile conditional paths and are not
 factory firmware configurations. The USB-minimal lane keeps UAC audio disabled;

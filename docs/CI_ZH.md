@@ -26,16 +26,19 @@
 ## 构建矩阵
 
 默认矩阵使用 ESP-IDF `v5.5.5` 与 `v6.0.2` 编译全部 12 个产品工程，共 24 个任务。
-完整源码影响运行还包含 18 个定向任务：
+完整源码影响运行还包含 17 个定向任务：
 
 - 示例 06 在两个 ESP-IDF 版本下各有 1 个 ES7210 至 ES8311 回声任务，共 2 个；
 - 示例 07 至 12 在两个 ESP-IDF 版本下的 12 个 RGB888 任务；
-- 示例 11 在两个 ESP-IDF 版本下各有 1 个 Brookesia AI 启用任务，共 2 个；
+- 示例 11 仅在 ESP-IDF `v5.5.5` 下有 1 个 Brookesia AI 启用任务；
 - 示例 12 关闭 HID 触摸与 UAC 音频的 2 个 USB 最小配置任务。
 
-因此完整矩阵共有 42 个 ESP-IDF 构建任务。音频回声覆盖配置会在两个受支持的 ESP-IDF
-版本线上编译板载 ES7210 麦克风与 ES8311 扬声器路径。Brookesia AI 覆盖配置会在两个受支持的
-ESP-IDF 版本线上编译相同的可选依赖路径；产品默认配置仍关闭 AI，以控制运行资源占用。
+因此完整矩阵共有 41 个 ESP-IDF 构建任务。音频回声覆盖配置会在两个受支持的 ESP-IDF
+版本线上编译板载 ES7210 麦克风与 ES8311 扬声器路径。Brookesia AI 覆盖配置仅在 `v5.5.5`
+上编译可选 AI 依赖路径：GMF 0.6.x AI 组件在其 CMake 文件顶层调用 `idf_build_set_property`，
+ESP-IDF v6.0 在早期的 `component_get_requirements` 阶段会拒绝该调用，因此在一致的 GMF 集
+升级前该通道保持 v5-only（见[组件说明](COMPONENTS_ZH.md)）。产品默认配置仍关闭 AI，以控制
+运行资源占用。
 [`config/ci/`](../config/ci/) 中的覆盖配置
 会追加在各工程 `sdkconfig.defaults` 之后，只用于编译条件路径，不是出厂固件配置。
 USB 最小通道会关闭 UAC 音频；`usb_device_uac` 会下载，但只在启用 UAC 音频时链接。

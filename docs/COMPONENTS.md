@@ -20,14 +20,17 @@ but not including, 2.6. Version 2.6 and newer require ESP32-P4 silicon revision
 3.0, while this product's checked-in defaults intentionally support earlier P4
 revisions. Keep this upper bound until the supported hardware floor changes.
 
-Example 11's Brookesia AI path is compiled with both ESP-IDF `v5.5.5` and
-`v6.0.2`. Its conditional manifest rules resolve the coherent GMF 0.6 dependency
-set whenever AI is enabled. GMF 0.6 lacks the newer keep-awake API, so the
-speaking timer and state flow do not call that unavailable function. Only
-AI-enabled `brookesia_core` C++ sources add `-fpermissive` for the GMF 0.6 C
-headers; default and non-AI profiles do not receive that flag. Any future GMF
-upgrade must keep the API-coupled dependency set coherent and validate both IDF
-lines rather than partially advancing one component.
+Example 11's Brookesia AI path compiles on ESP-IDF `v5.5.5` only. Its conditional
+manifest rules resolve the coherent GMF 0.6 dependency set whenever AI is
+enabled on that line. The GMF 0.6.x AI components call `idf_build_set_property`
+at the top level of their CMake files; ESP-IDF v6.0 rejects that call during its
+early `component_get_requirements` pass, so the AI overlay is not a v6 lane yet.
+GMF 0.6 also lacks the newer keep-awake API, so the speaking timer and state flow
+do not call that unavailable function. Only AI-enabled `brookesia_core` C++
+sources add `-fpermissive` for the GMF 0.6 C headers; default and non-AI profiles
+do not receive that flag. Any future GMF upgrade must keep the API-coupled
+dependency set coherent, restore the v6 AI lane, and validate both IDF lines
+rather than partially advancing one component.
 
 Example 12 downloads `usb_device_uac` 1.2.0 but marks it non-required. Its
 component link is enabled only with UAC audio, allowing the minimal HID/display

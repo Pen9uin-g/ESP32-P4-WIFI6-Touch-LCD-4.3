@@ -231,6 +231,10 @@ def discover_changed_route(base_ref: str | None, head_ref: str, known_examples: 
     return classify_paths(paths_from_name_status(run_git(diff_args)), known_examples)
 
 
+def _idf_major(idf_version: str) -> int:
+    return int(idf_version.removeprefix("v").split(".", 1)[0])
+
+
 def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str], ...]:
     name = PurePosixPath(example).name
     variants: list[tuple[str, str]] = [("default", "")]
@@ -239,7 +243,14 @@ def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str
     if name in RGB888_EXAMPLES:
         overlay = "usb_rgb888.defaults" if name == "12_usb_extend_screen" else "rgb888.defaults"
         variants.append(("rgb888", f"../../../config/ci/{overlay}"))
-    if name == "11_esp_brookesia_phone":
+    if name == "11_esp_brookesia_phone" and _idf_major(idf_version) < 6:
+        # The GMF 0.6.x AI components (esp_coze, gmf_core, gmf_io, ...) call
+        # idf_build_set_property at the top level of their CMakeLists.txt.
+        # ESP-IDF v6.0 parses component CMakeLists during an early
+        # component_get_requirements pass before that build-time helper is
+        # defined, so the AI overlay only builds on the v5.x line. It stays a
+        # v5-only lane until the coherent GMF set is upgraded to an ESP-IDF v6
+        # compatible release (see docs/COMPONENTS.md).
         variants.append(("ai", "../../../config/ci/brookesia_ai.defaults"))
     if name == "12_usb_extend_screen":
         variants.append(("minimal", "../../../config/ci/usb_minimal.defaults"))
