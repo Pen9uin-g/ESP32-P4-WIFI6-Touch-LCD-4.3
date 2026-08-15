@@ -41,7 +41,7 @@ class CiFirmwareTests(unittest.TestCase):
         for bad in ("https://example.invalid/owner/repository", "https://github.com/owner/repo?x=1", "git@github.com:owner/repo;bad"):
             with self.assertRaises(core.SafetyError): core.parse_github_origin(bad)
 
-    def test_catalog_is_exact_authoritative_39_lane_names(self) -> None:
+    def test_catalog_is_exact_authoritative_42_lane_names(self) -> None:
         names = {lane.artifact for lane in core.load_catalog(ROOT)}
         expected = set()
         examples = ("01_HowToCreateProject", "02_HelloWorld", "03_i2c_tools", "04_wifistation", "05_sdmmc", "06_I2SCodec", "07_Displaycolorbar", "08_lvgl_demo_v9", "09_video_lcd_display", "10_mp4_player", "11_esp_brookesia_phone", "12_usb_extend_screen")
@@ -51,9 +51,16 @@ class CiFirmwareTests(unittest.TestCase):
         for example in ("07_Displaycolorbar", "08_lvgl_demo_v9", "09_video_lcd_display", "10_mp4_player", "11_esp_brookesia_phone", "12_usb_extend_screen"):
             for version in ("v5.5.5", "v6.0.2"):
                 expected.add(f"firmware-esp-idf-{example.lower().replace('_', '-')}-{version}-rgb888")
-        expected |= {"firmware-esp-idf-11-esp-brookesia-phone-v5.5.5-ai", "firmware-esp-idf-12-usb-extend-screen-v5.5.5-minimal", "firmware-esp-idf-12-usb-extend-screen-v6.0.2-minimal"}
+        expected |= {
+            "firmware-esp-idf-06-i2scodec-v5.5.5-echo",
+            "firmware-esp-idf-06-i2scodec-v6.0.2-echo",
+            "firmware-esp-idf-11-esp-brookesia-phone-v5.5.5-ai",
+            "firmware-esp-idf-11-esp-brookesia-phone-v6.0.2-ai",
+            "firmware-esp-idf-12-usb-extend-screen-v5.5.5-minimal",
+            "firmware-esp-idf-12-usb-extend-screen-v6.0.2-minimal",
+        }
         self.assertEqual(names, expected)
-        self.assertEqual(len(names), 39)
+        self.assertEqual(len(names), 42)
 
     def test_auth_prefers_authenticated_gh_then_token_and_never_anonymous(self) -> None:
         self.assertEqual(core.auth_mode(lambda _: "gh", {}, lambda: True), ("gh", None))
@@ -75,6 +82,32 @@ class CiFirmwareTests(unittest.TestCase):
         api = FakeApi({"/jobs?": {"jobs": [{"name": "Preflight and route changes", "conclusion": "success"}]}, "/artifacts?": {"artifacts": []}})
         with self.assertRaises(core.SafetyError):
             core.verify_run_coverage(api, 1, lanes)
+
+    def test_complete_coverage_uses_the_authoritative_lane_count(self) -> None:
+        lanes = core.load_catalog(ROOT)
+        head = "a" * 40
+        jobs = [
+            {
+                "name": "Preflight and route changes",
+                "status": "completed",
+                "conclusion": "success",
+            },
+            *[
+                {"name": lane.job_name, "status": "completed", "conclusion": "success"}
+                for lane in lanes
+            ],
+        ]
+        artifacts = [
+            {
+                "name": lane.artifact,
+                "size_in_bytes": 1,
+                "expired": False,
+                "workflow_run": {"id": 7, "head_sha": head},
+            }
+            for lane in lanes
+        ]
+        api = FakeApi({"/jobs?": {"jobs": jobs}, "/artifacts?": {"artifacts": artifacts}})
+        self.assertEqual(core.verify_run_coverage(api, 7, lanes, head), artifacts)
 
     def test_zip_rejects_traversal_symlink_and_duplicate_path(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

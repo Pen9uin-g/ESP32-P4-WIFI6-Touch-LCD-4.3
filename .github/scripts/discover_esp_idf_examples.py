@@ -28,20 +28,26 @@ GLOBAL_BUILD_PATTERNS = (
     ".github/scripts/check_repository.py",
     ".github/tests/**",
     "config/ci/**",
-    "releases/**",
+    "releases/package_firmware.py",
     "Flash-CI-Firmware.cmd",
     "Flash-CI-Firmware.sh",
     "scripts/Flash-CI-Firmware.ps1",
     "scripts/ci_firmware.py",
 )
-DOCUMENTATION_PATTERNS = (
-    "*.md",
-    "docs/**",
-    "assets/**",
-    "schematic/**",
-    ".github/ISSUE_TEMPLATE/**",
+DOCUMENTATION_ASSET_PATTERNS = (
+    "assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg",
+    "schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf",
+)
+NON_BUILD_PATTERNS = (
+    ".gitignore",
+    "LICENSE",
+    "LICENSE.txt",
+    ".github/CODEOWNERS",
+    ".github/FUNDING.yml",
+    ".github/ISSUE_TEMPLATE/*.md",
+    ".github/ISSUE_TEMPLATE/*.yml",
+    ".github/ISSUE_TEMPLATE/*.yaml",
     ".github/pull_request_template.md",
-    ".github/markdown-audit.json",
 )
 FIRMWARE_PATTERNS = ("firmware/**", "Firmware/**", "FirmWare/**")
 
@@ -156,15 +162,18 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
     docs = False
     firmware = False
     global_build = False
+    non_build = False
 
     for raw_path in paths:
         path = normalize_path(raw_path)
-        if matches_any(path, GLOBAL_BUILD_PATTERNS):
-            global_build = True
-        elif matches_any(path, FIRMWARE_PATTERNS):
+        if matches_any(path, FIRMWARE_PATTERNS):
             firmware = True
-        elif matches_any(path, DOCUMENTATION_PATTERNS):
+        elif matches_any(path, NON_BUILD_PATTERNS):
+            non_build = True
+        elif path.lower().endswith(".md") or matches_any(path, DOCUMENTATION_ASSET_PATTERNS):
             docs = True
+        elif matches_any(path, GLOBAL_BUILD_PATTERNS):
+            global_build = True
         else:
             example = example_for_path(path, known_examples)
             if example:
@@ -183,10 +192,19 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
         kind = "examples"
     elif firmware:
         kind = "firmware"
-    else:
+    elif docs and not non_build:
         kind = "docs"
+    else:
+        kind = "non_build"
 
-    docs_only = docs and not selected and not firmware and not unknown and not global_build
+    docs_only = (
+        docs
+        and not non_build
+        and not selected
+        and not firmware
+        and not unknown
+        and not global_build
+    )
     return Route(
         selected=tuple(sorted(selected)),
         kind=kind,
@@ -216,10 +234,12 @@ def discover_changed_route(base_ref: str | None, head_ref: str, known_examples: 
 def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str], ...]:
     name = PurePosixPath(example).name
     variants: list[tuple[str, str]] = [("default", "")]
+    if name == "06_I2SCodec":
+        variants.append(("echo", "../../../config/ci/i2s_echo.defaults"))
     if name in RGB888_EXAMPLES:
         overlay = "usb_rgb888.defaults" if name == "12_usb_extend_screen" else "rgb888.defaults"
         variants.append(("rgb888", f"../../../config/ci/{overlay}"))
-    if name == "11_esp_brookesia_phone" and idf_version == "v5.5.5":
+    if name == "11_esp_brookesia_phone":
         variants.append(("ai", "../../../config/ci/brookesia_ai.defaults"))
     if name == "12_usb_extend_screen":
         variants.append(("minimal", "../../../config/ci/usb_minimal.defaults"))
@@ -279,7 +299,7 @@ def main() -> int:
     known_examples = set(list_examples())
     if not known_examples:
         print("No direct ESP-IDF product examples were found.", file=sys.stderr)
-        return 1
+        return 2
 
     requested_example = normalize_example(args.example, known_examples)
     try:
@@ -297,7 +317,7 @@ def main() -> int:
             route = discover_changed_route(args.base_ref, args.head_ref, known_examples)
     except (RoutingError, subprocess.CalledProcessError) as error:
         print(f"Unable to determine a safe CI route: {error}", file=sys.stderr)
-        return 1
+        return 2
 
     emit(route)
     return 0

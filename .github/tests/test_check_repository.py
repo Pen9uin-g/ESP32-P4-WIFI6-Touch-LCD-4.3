@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import sys
 import tempfile
@@ -16,6 +17,32 @@ SPEC.loader.exec_module(checks)
 
 
 class RepositoryCheckTests(unittest.TestCase):
+    def test_factory_firmware_identity_locks_path_size_and_sha256(self) -> None:
+        payload = b"synthetic immutable factory image"
+        digest = hashlib.sha256(payload).hexdigest()
+        expected = "firmware/product-FactoryOnly.bin"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            image = root / expected
+            image.parent.mkdir(parents=True)
+            image.write_bytes(payload)
+            kwargs = {
+                "expected_path": expected,
+                "expected_size": len(payload),
+                "expected_sha256": digest,
+            }
+            self.assertEqual(checks.factory_firmware_integrity_errors(root, **kwargs), [])
+
+            image.write_bytes(payload + b"changed")
+            errors = checks.factory_firmware_integrity_errors(root, **kwargs)
+            self.assertTrue(any("immutable size changed" in error for error in errors))
+            self.assertTrue(any("immutable SHA-256 changed" in error for error in errors))
+
+            image.write_bytes(payload)
+            (image.parent / "unexpected.bin").write_bytes(b"extra")
+            errors = checks.factory_firmware_integrity_errors(root, **kwargs)
+            self.assertTrue(any("sole immutable factory firmware" in error for error in errors))
+
     def test_reviewed_bsp_pin_requires_exact_mapping(self) -> None:
         manifest = (
             "dependencies:\n"
@@ -57,6 +84,91 @@ class RepositoryCheckTests(unittest.TestCase):
             (root / checks.BSP_BASE_COMPONENT_DIRS[0]).mkdir(parents=True)
             errors = checks.bsp_pin_policy_errors(root)
             self.assertTrue(any("local base BSP path must be absent" in error for error in errors))
+
+            (root / checks.BSP_BASE_COMPONENT_DIRS[0]).rmdir()
+            (root / checks.BSP_FORBIDDEN_EXTENSION_DIRS[0]).mkdir(parents=True)
+            (root / checks.BSP_FORBIDDEN_EXTENSION_DIRS[0] / "CMakeLists.txt").touch()
+            errors = checks.bsp_pin_policy_errors(root)
+            self.assertTrue(any("unused product extension" in error for error in errors))
+
+    def test_product_flash_size_is_unambiguous(self) -> None:
+        relative = "examples/esp-idf/03_i2c_tools/sdkconfig.defaults"
+        self.assertEqual(
+            checks.flash_size_selection_errors("CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y\n", relative),
+            [],
+        )
+        for defaults in (
+            "CONFIG_ESPTOOLPY_FLASHSIZE_2MB=y\nCONFIG_ESPTOOLPY_FLASHSIZE_32MB=y\n",
+            "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y\n",
+            "",
+        ):
+            with self.subTest(defaults=defaults):
+                self.assertTrue(checks.flash_size_selection_errors(defaults, relative))
+
+    def test_sdkconfig_defaults_do_not_repeat_active_assignments(self) -> None:
+        relative = "examples/esp-idf/03_i2c_tools/sdkconfig.defaults"
+        self.assertEqual(
+            checks.duplicate_sdkconfig_assignment_errors(
+                "CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y\nCONFIG_SPIRAM=y\n", relative
+            ),
+            [],
+        )
+        errors = checks.duplicate_sdkconfig_assignment_errors(
+            "CONFIG_SPIRAM=y\nCONFIG_SPIRAM=n\n", relative
+        )
+        self.assertEqual(errors, [f"{relative}: repeated sdkconfig assignment CONFIG_SPIRAM"])
+
+    def test_wifi_password_is_not_logged(self) -> None:
+        safe = "ESP_LOGI(TAG, \"connected to SSID:%s\", EXAMPLE_ESP_WIFI_SSID);\n"
+        unsafe = (
+            "ESP_LOGI(TAG, \"connected to SSID:%s password:%s\",\n"
+            "         EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);\n"
+        )
+        self.assertEqual(checks.wifi_public_log_errors(safe), [])
+        self.assertTrue(checks.wifi_public_log_errors(unsafe))
+        self.assertTrue(checks.wifi_public_log_errors('printf("%s", EXAMPLE_ESP_WIFI_PASS);\n'))
+        self.assertEqual(
+            checks.wifi_public_log_errors('// printf("%s", EXAMPLE_ESP_WIFI_PASS);\n'),
+            [],
+        )
+
+    def test_i2s_codec_uses_public_board_codec_paths(self) -> None:
+        source = "\n".join(
+            (
+                "#if CONFIG_EXAMPLE_MODE_ECHO",
+                "bsp_audio_codec_speaker_init();",
+                "bsp_audio_codec_microphone_init();",
+                "esp_codec_dev_read(microphone, buffer, size);",
+                "esp_codec_dev_write(speaker, buffer, size);",
+                ".channel = 2,",
+                ".channel_mask = 0x03,",
+                "#endif",
+            )
+        )
+        overlay = "CONFIG_EXAMPLE_MODE_ECHO=y\n"
+        config = "#define EXAMPLE_MCLK_MULTIPLE (256)\n"
+        self.assertEqual(checks.audio_bsp_contract_errors(source, overlay, config), [])
+        self.assertTrue(
+            checks.audio_bsp_contract_errors(source + "\nBSP_I2S_GPIO_CFG();\n", overlay, config)
+        )
+        self.assertTrue(checks.audio_bsp_contract_errors(source, "", config))
+        self.assertTrue(
+            checks.audio_bsp_contract_errors(
+                source.replace(".channel = 2", ".channel = 1"), overlay, config
+            )
+        )
+        comment_only = "/*\n" + source + "\n*/\n"
+        self.assertTrue(checks.audio_bsp_contract_errors(comment_only, overlay, config))
+        literal_only = 'const char *fake = "' + source.replace('"', '\\"').replace("\n", " ") + '";\n'
+        self.assertTrue(checks.audio_bsp_contract_errors(literal_only, overlay, config))
+        self.assertEqual(
+            checks.audio_bsp_contract_errors(
+                source + "\n// i2s_channel_read(fake);\n", overlay, config
+            ),
+            [],
+        )
+        self.assertTrue(checks.audio_bsp_contract_errors(source, overlay, config.replace("256", "384")))
+
     def test_usb_audio_dependency_boundary(self) -> None:
         manifest = (
             'espressif/usb_device_uac:\n'

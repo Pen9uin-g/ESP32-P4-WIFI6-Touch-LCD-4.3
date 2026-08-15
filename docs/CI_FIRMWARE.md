@@ -2,10 +2,17 @@
 
 [中文](CI_FIRMWARE_ZH.md) · [CI guide](CI.md)
 
-The ESP-IDF workflow creates 39 temporary flashable diagnostic packages, one
-for each current matrix lane. They are built from each lane's
-`flasher_args.json`; they never replace the immutable factory image under
+A complete ESP-IDF matrix run, such as a manual `all` run or a global build-input
+change, creates 42 temporary flashable diagnostic packages. A path-routed run
+creates packages only for its selected lanes. Every package comes from that
+lane's `flasher_args.json`; none replaces the immutable factory image under
 [`firmware/`](../firmware/). Artifacts expire after seven days.
+
+The repository audit locks that factory image to
+`ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin`, 33,488,896 bytes, with
+SHA-256 `f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022`.
+Changing any of those three identity fields requires an explicit release review
+and a matching audit-policy update; example CI never regenerates the file.
 
 ## Provenance and authentication
 
@@ -20,8 +27,10 @@ Prerequisites are Git, Python 3 (`python` or `py -3` on Windows), and either an
 authenticated `gh` login or `GH_TOKEN`/`GITHUB_TOKEN`. Anonymous
 artifact download is intentionally unavailable. The tool reports the resolved
 repository, branch, HEAD SHA, run ID, and run URL. Before listing or downloading,
-it requires one successful preflight, all 39 expected successful build jobs, and
-exactly the 39 expected non-empty, non-expired artifacts.
+it requires one successful preflight, all 42 expected successful build jobs, and
+exactly the 42 expected non-empty, non-expired artifacts. It deliberately
+rejects a successful partial path-routed run; start or select a complete matrix
+run before using the downloader.
 
 ## Commands
 

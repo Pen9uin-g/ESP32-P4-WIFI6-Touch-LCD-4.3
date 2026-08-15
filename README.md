@@ -70,7 +70,7 @@ update.
 | [03_i2c_tools](examples/esp-idf/03_i2c_tools/) | I2C bus inspection and device scanning |
 | [04_wifistation](examples/esp-idf/04_wifistation/) | Wi-Fi station through the ESP32-C6 hosted connection |
 | [05_sdmmc](examples/esp-idf/05_sdmmc/) | Onboard microSD access over SDMMC |
-| [06_I2SCodec](examples/esp-idf/06_I2SCodec/) | ES8311 audio playback and microphone loopback |
+| [06_I2SCodec](examples/esp-idf/06_I2SCodec/) | ES8311 playback and ES7210 microphone loopback through the board BSP |
 | [07_Displaycolorbar](examples/esp-idf/07_Displaycolorbar/) | MIPI-DSI display initialization and color bars |
 | [08_lvgl_demo_v9](examples/esp-idf/08_lvgl_demo_v9/) | LVGL 9 display and touch demonstration |
 | [09_video_lcd_display](examples/esp-idf/09_video_lcd_display/) | MIPI-CSI camera preview on the MIPI-DSI display |
@@ -86,13 +86,13 @@ on the target board and connected accessories.
 
 | Surface | Version | Default builds | Conditional builds |
 | --- | --- | ---: | ---: |
-| ESP-IDF | `v5.5.5` | 12 | 8 |
-| ESP-IDF | `v6.0.2` | 12 | 7 |
+| ESP-IDF | `v5.5.5` | 12 | 9 |
+| ESP-IDF | `v6.0.2` | 12 | 9 |
 
 The [ESP-IDF examples workflow](.github/workflows/esp-idf-examples.yml) discovers
 the 12 direct first-party projects under `examples/esp-idf/`. A full source run
-contains one preflight job and 39 build jobs: 24 defaults plus RGB888,
-Brookesia-AI, and USB-minimal configurations. Documentation-only changes run the
+contains one preflight job and 42 build jobs: 24 defaults plus audio-echo,
+RGB888, Brookesia-AI, and USB-minimal configurations. Documentation-only changes run the
 preflight without ESP-IDF builds; factory-firmware changes are reported for
 release review but are never treated as example sources. Unknown paths trigger
 the complete matrix, while an empty or unreadable diff fails closed. See the

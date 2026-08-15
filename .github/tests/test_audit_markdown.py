@@ -538,6 +538,88 @@ class MarkdownAuditTests(unittest.TestCase):
         for path in ("firmware/other.uf2", "firmware/other.elf", "firmware/other.hex"):
             self.assertEqual("DOCS_ONLY_NON_MARKDOWN_CHANGE", by_path[path])
 
+    def test_exact_base_cli_docs_only_contract_accepts_only_configured_assets(self) -> None:
+        self.write(
+            ".github/markdown-audit.json",
+            json.dumps({"docs_only_allowed_patterns": ["assets/hero.png"]}),
+        )
+        self.init_git()
+        subprocess.run(["git", "add", "."], cwd=self.root, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "base"],
+            cwd=self.root,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.root, text=True).strip()
+
+        self.write("docs/guide.md", "[简体中文](guide_ZH.md)\n\nDocs update.\n")
+        self.write("docs/guide_ZH.md", "[English](guide.md)\n\n文档更新。\n")
+        self.write("assets/hero.png", b"reviewed-doc-asset-update")
+        subprocess.run(["git", "add", "."], cwd=self.root, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "docs"],
+            cwd=self.root,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_PATH),
+                str(self.root),
+                "--base",
+                base,
+                "--config",
+                ".github/markdown-audit.json",
+                "--expect-docs-only",
+                "--format",
+                "json",
+            ],
+            cwd=self.root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertEqual(process.returncode, 0, process.stderr or process.stdout)
+        self.assertTrue(json.loads(process.stdout)["scope"]["expect_docs_only"])
+
+        docs_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.root, text=True).strip()
+        self.write(
+            ".github/markdown-audit.json",
+            json.dumps({"docs_only_allowed_patterns": ["assets/hero.png"]}, indent=2) + "\n",
+        )
+        subprocess.run(["git", "add", ".github/markdown-audit.json"], cwd=self.root, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "audit config"],
+            cwd=self.root,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        process = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_PATH),
+                str(self.root),
+                "--base",
+                docs_head,
+                "--config",
+                ".github/markdown-audit.json",
+                "--expect-docs-only",
+                "--format",
+                "json",
+            ],
+            cwd=self.root,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        self.assertEqual(process.returncode, 1)
+        self.assertIn("DOCS_ONLY_CONFIG_CHANGE", process.stdout)
+
     def test_ownership_defaults_and_config_override(self) -> None:
         self.write("managed_components/pkg/README.md", "upstream\n")
         self.write("third_party/pkg/README.md", "upstream\n")

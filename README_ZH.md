@@ -65,7 +65,7 @@ ESP-IDF 示例固件。
 | [03_i2c_tools](examples/esp-idf/03_i2c_tools/) | I2C 总线检测与设备扫描 |
 | [04_wifistation](examples/esp-idf/04_wifistation/) | 通过 ESP32-C6 Hosted 连接接入 Wi-Fi |
 | [05_sdmmc](examples/esp-idf/05_sdmmc/) | 通过 SDMMC 访问板载 MicroSD 卡 |
-| [06_I2SCodec](examples/esp-idf/06_I2SCodec/) | ES8311 音频播放和麦克风回放 |
+| [06_I2SCodec](examples/esp-idf/06_I2SCodec/) | 通过板级 BSP 使用 ES8311 播放及 ES7210 麦克风回放 |
 | [07_Displaycolorbar](examples/esp-idf/07_Displaycolorbar/) | MIPI-DSI 显示初始化和彩条测试 |
 | [08_lvgl_demo_v9](examples/esp-idf/08_lvgl_demo_v9/) | LVGL 9 显示与触摸示例 |
 | [09_video_lcd_display](examples/esp-idf/09_video_lcd_display/) | MIPI-CSI 摄像头画面显示到 MIPI-DSI 屏幕 |
@@ -80,12 +80,12 @@ ESP-IDF 示例固件。
 
 | 开发框架 | 版本 | 默认构建 | 条件配置构建 |
 | --- | --- | ---: | ---: |
-| ESP-IDF | `v5.5.5` | 12 | 8 |
-| ESP-IDF | `v6.0.2` | 12 | 7 |
+| ESP-IDF | `v5.5.5` | 12 | 9 |
+| ESP-IDF | `v6.0.2` | 12 | 9 |
 
 [ESP-IDF 示例工作流](.github/workflows/esp-idf-examples.yml)会发现
 `examples/esp-idf/` 下 12 个直接第一方工程。完整源码运行包含 1 个预检任务和
-39 个构建任务：24 个默认配置，以及 RGB888、Brookesia AI 与 USB 最小配置。
+42 个构建任务：24 个默认配置，以及音频回声、RGB888、Brookesia AI 与 USB 最小配置。
 仅文档修改只运行预检；出厂固件修改会提示发布审核，但不会作为示例源码处理。未知路径
 会触发完整矩阵，差异为空或无法读取时则直接失败。路由与证据边界详见
 [CI 指南](docs/CI_ZH.md)。

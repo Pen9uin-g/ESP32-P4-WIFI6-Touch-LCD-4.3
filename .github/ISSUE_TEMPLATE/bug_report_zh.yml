@@ -12,11 +12,35 @@ body:
       placeholder: ESP32-P4-WIFI6-Touch-LCD-4.3，以及 PCB 上标注的版本
     validations:
       required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题摘要
+      description: 请简要说明问题表现及首次出现的时间或条件。
+    validations:
+      required: true
   - type: input
     id: example
     attributes:
       label: 示例路径
       placeholder: examples/esp-idf/09_video_lcd_display
+    validations:
+      required: true
+  - type: dropdown
+    id: firmware_source
+    attributes:
+      label: 软件或固件来源
+      options:
+        - 从本仓库源码构建或使用 CI 产物
+        - 仓库内的出厂或恢复镜像
+        - 其他有文档记录的镜像
+    validations:
+      required: true
+  - type: input
+    id: build_identity
+    attributes:
+      label: 构建或镜像标识
+      description: 请提供源码提交与配置、CI 产物名称，或精确的出厂/恢复镜像文件名。
     validations:
       required: true
   - type: input

@@ -136,8 +136,8 @@ def load_catalog(root: Path | None = None) -> list[Lane]:
     spec.loader.exec_module(module)
     matrix = module.build_matrix(module.list_examples(root))["include"]
     lanes = [Lane(item["example"], item["idf_version"], item["variant"], item["artifact_name"]) for item in matrix]
-    if len(lanes) != 39 or len({lane.artifact for lane in lanes}) != 39:
-        raise SafetyError("the active discovery/workflow matrix must derive exactly 39 unique artifacts")
+    if not lanes or len({lane.artifact for lane in lanes}) != len(lanes):
+        raise SafetyError("the active discovery/workflow matrix must derive a non-empty set of unique artifacts")
     return lanes
 
 
@@ -247,18 +247,19 @@ def verify_run_coverage(api: GitHub, run_id: int, lanes: list[Lane], head: str |
     preflight = [job for job in jobs if job.get("name") == "Preflight and route changes"]
     expected_jobs = {lane.job_name for lane in lanes}
     builds = [job for job in jobs if str(job.get("name", "")).startswith("Build ")]
-    if (len(jobs) != 40 or len(preflight) != 1 or preflight[0].get("status") != "completed" or preflight[0].get("conclusion") != "success" or
-            len(builds) != 39 or {job.get("name") for job in builds} != expected_jobs or
+    lane_count = len(lanes)
+    if (len(jobs) != lane_count + 1 or len(preflight) != 1 or preflight[0].get("status") != "completed" or preflight[0].get("conclusion") != "success" or
+            len(builds) != lane_count or {job.get("name") for job in builds} != expected_jobs or
             any(job.get("status") != "completed" or job.get("conclusion") != "success" for job in builds)):
-        raise SafetyError("run does not have exactly one successful preflight and all 39 expected successful build jobs")
+        raise SafetyError(f"run does not have exactly one successful preflight and all {lane_count} expected successful build jobs")
     artifacts = get_all(api, f"repos/{api.repo}/actions/runs/{run_id}/artifacts", "artifacts")
     expected_artifacts = {lane.artifact for lane in lanes}
-    if (len(artifacts) != 39 or {item.get("name") for item in artifacts} != expected_artifacts or
+    if (len(artifacts) != lane_count or {item.get("name") for item in artifacts} != expected_artifacts or
             any(item.get("expired") or not isinstance(item.get("size_in_bytes"), int) or item["size_in_bytes"] <= 0 or
                 ("workflow_run" in item and (not isinstance(item["workflow_run"], dict) or item["workflow_run"].get("id") != run_id or
                  (isinstance(item["workflow_run"].get("head_sha"), str) and bool(item["workflow_run"]["head_sha"]) and
                   head is not None and item["workflow_run"]["head_sha"] != head))) for item in artifacts)):
-        raise SafetyError("run does not have exactly 39 unique, non-expired, non-empty expected artifacts")
+        raise SafetyError(f"run does not have exactly {lane_count} unique, non-expired, non-empty expected artifacts")
     return artifacts
 
 
@@ -493,7 +494,7 @@ def self_test(root: Path, catalog_only: bool = False) -> None:
             except SafetyError:
                 continue
             raise SafetyError("self-test did not reject unsafe ZIP path")
-    print("SELF_TEST_OK lanes=39 manual-confirmation=true one-item=true")
+    print(f"SELF_TEST_OK lanes={len(lanes)} manual-confirmation=true one-item=true")
 
 
 def main(argv: list[str] | None = None) -> int:

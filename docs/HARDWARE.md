@@ -4,7 +4,7 @@
 
 This audit compares the checked-in
 [schematic](../schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf) with the
-local board-support component used by examples 07–12. It is a repository review,
+reviewed upstream BSP source pinned by examples 06–12. It is a repository review,
 not a substitute for checking the physical board revision.
 
 ## Confirmed product interfaces

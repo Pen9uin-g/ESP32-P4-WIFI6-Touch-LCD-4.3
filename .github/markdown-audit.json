@@ -105,5 +105,9 @@
   ],
   "pair_exempt_patterns": [
     ".github/pull_request_template.md"
+  ],
+  "docs_only_allowed_patterns": [
+    "assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg",
+    "schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf"
   ]
 }

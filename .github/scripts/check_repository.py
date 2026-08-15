@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -38,6 +39,7 @@ REQUIRED_PAIRS = (
     ),
 )
 REQUIRED_CI_DEFAULTS = (
+    "config/ci/i2s_echo.defaults",
     "config/ci/rgb888.defaults",
     "config/ci/usb_rgb888.defaults",
     "config/ci/brookesia_ai.defaults",
@@ -67,6 +69,7 @@ BSP_PIN_FIELDS = {
     "version": "ac94f5da7c0e44963828ab970337e89d23e04330",
 }
 BSP_BASE_COMPONENT_DIRS = (
+    "examples/esp-idf/06_I2SCodec/components/esp32_p4_wifi6_touch_lcd_4_3",
     "examples/esp-idf/07_Displaycolorbar/components/esp32_p4_wifi6_touch_lcd_4_3",
     "examples/esp-idf/08_lvgl_demo_v9/components/esp32_p4_wifi6_touch_lcd_4_3",
     "examples/esp-idf/09_video_lcd_display/components/esp32_p4_wifi6_touch_lcd_4_3",
@@ -75,17 +78,23 @@ BSP_BASE_COMPONENT_DIRS = (
     "examples/esp-idf/12_usb_extend_screen/components/esp32_p4_wifi6_touch_lcd_4_3",
 )
 BSP_EXTRA_COMPONENT_DIRS = (
-    "examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra",
     "examples/esp-idf/12_usb_extend_screen/components/bsp_extra",
 )
+BSP_FORBIDDEN_EXTENSION_DIRS = (
+    "examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra",
+)
 BSP_MANIFESTS = (
+    "examples/esp-idf/06_I2SCodec/main/idf_component.yml",
     "examples/esp-idf/07_Displaycolorbar/main/idf_component.yml",
-    "examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra/idf_component.yml",
+    "examples/esp-idf/08_lvgl_demo_v9/main/idf_component.yml",
     "examples/esp-idf/09_video_lcd_display/main/idf_component.yml",
     "examples/esp-idf/10_mp4_player/main/idf_component.yml",
     "examples/esp-idf/11_esp_brookesia_phone/main/idf_component.yml",
     "examples/esp-idf/12_usb_extend_screen/components/bsp_extra/idf_component.yml",
 )
+FACTORY_FIRMWARE_PATH = "firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin"
+FACTORY_FIRMWARE_SIZE = 33_488_896
+FACTORY_FIRMWARE_SHA256 = "f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022"
 
 
 def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
@@ -97,6 +106,45 @@ def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
         for path in root.iterdir()
         if path.is_dir() and (path / "CMakeLists.txt").is_file() and (path / "main").is_dir()
     )
+
+
+def factory_firmware_integrity_errors(
+    repo_root: Path,
+    *,
+    expected_path: str = FACTORY_FIRMWARE_PATH,
+    expected_size: int = FACTORY_FIRMWARE_SIZE,
+    expected_sha256: str = FACTORY_FIRMWARE_SHA256,
+) -> list[str]:
+    """Require the reviewed factory image identity without modifying the artifact."""
+    firmware_root = repo_root / "firmware"
+    binaries = sorted(
+        path.relative_to(repo_root).as_posix()
+        for path in firmware_root.rglob("*")
+        if path.is_file() and path.suffix.lower() == ".bin"
+    ) if firmware_root.is_dir() else []
+    errors: list[str] = []
+    if binaries != [expected_path]:
+        errors.append(
+            f"expected the sole immutable factory firmware binary at {expected_path}; "
+            f"found {', '.join(binaries) if binaries else 'none'}"
+        )
+
+    image = repo_root / expected_path
+    if not image.is_file():
+        return errors
+    size = image.stat().st_size
+    if size != expected_size:
+        errors.append(
+            f"{expected_path}: immutable size changed (expected {expected_size}, found {size})"
+        )
+    hasher = hashlib.sha256()
+    with image.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
+    if digest != expected_sha256:
+        errors.append(f"{expected_path}: immutable SHA-256 changed")
+    return errors
 
 
 def pinned_bsp_dependency_errors(manifest: str) -> list[str]:
@@ -129,7 +177,7 @@ def pinned_bsp_dependency_errors(manifest: str) -> list[str]:
 
 
 def bsp_pin_policy_errors(repo_root: Path = REPO_ROOT) -> list[str]:
-    """Keep local base BSP copies removed while retaining the two product extensions."""
+    """Keep local base BSP copies removed while retaining the required product extension."""
     errors: list[str] = []
     for relative in BSP_BASE_COMPONENT_DIRS:
         if (repo_root / relative).exists():
@@ -137,6 +185,10 @@ def bsp_pin_policy_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     for relative in BSP_EXTRA_COMPONENT_DIRS:
         if not (repo_root / relative).is_dir():
             errors.append(f"{relative}: required product bsp_extra tree is missing")
+    for relative in BSP_FORBIDDEN_EXTENSION_DIRS:
+        path = repo_root / relative
+        if path.is_file() or (path.is_dir() and any(child.is_file() for child in path.rglob("*"))):
+            errors.append(f"{relative}: unused product extension must remain removed")
     for relative in BSP_MANIFESTS:
         path = repo_root / relative
         try:
@@ -145,6 +197,78 @@ def bsp_pin_policy_errors(repo_root: Path = REPO_ROOT) -> list[str]:
             errors.append(f"{relative}: cannot read BSP manifest: {error}")
             continue
         errors.extend(f"{relative}: {error}" for error in pinned_bsp_dependency_errors(manifest))
+    return errors
+
+
+def flash_size_selection_errors(defaults: str, relative: str) -> list[str]:
+    """Require one unambiguous 32 MB product flash selection."""
+    selections = re.findall(
+        r"(?m)^CONFIG_ESPTOOLPY_FLASHSIZE_([A-Za-z0-9_]+)=y[ \t]*$", defaults
+    )
+    if selections != ["32MB"]:
+        rendered = ", ".join(selections) if selections else "none"
+        return [f"{relative}: expected only the 32MB flash selection; found {rendered}"]
+    return []
+
+
+def duplicate_sdkconfig_assignment_errors(defaults: str, relative: str) -> list[str]:
+    """Reject repeated active sdkconfig defaults whose ordering is easy to misread."""
+    assignments = re.findall(r"(?m)^(CONFIG_[A-Za-z0-9_]+)=", defaults)
+    duplicates = sorted({key for key in assignments if assignments.count(key) > 1})
+    return [f"{relative}: repeated sdkconfig assignment {key}" for key in duplicates]
+
+
+def strip_c_comments_and_literals(source: str) -> str:
+    """Blank C/C++ comments and quoted literals while preserving line boundaries."""
+    token = re.compile(
+        r'//[^\r\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'',
+        flags=re.DOTALL,
+    )
+    return token.sub(lambda match: re.sub(r"[^\r\n]", " ", match.group(0)), source)
+
+
+def wifi_public_log_errors(source: str) -> list[str]:
+    """Prevent the configured Wi-Fi password from entering public serial logs."""
+    active_source = strip_c_comments_and_literals(source)
+    log_calls = re.findall(
+        r"(?:ESP_LOG[A-Z]+|printf|fprintf|puts)\s*\([^;]*\);",
+        active_source,
+        flags=re.DOTALL,
+    )
+    if any("EXAMPLE_ESP_WIFI_PASS" in call or ".password" in call for call in log_calls):
+        return ["04_wifistation: Wi-Fi credentials must not be written to serial logs"]
+    return []
+
+
+def audio_bsp_contract_errors(source: str, overlay: str, config: str) -> list[str]:
+    """Keep example 06 on the public board speaker/microphone codec APIs."""
+    active_source = strip_c_comments_and_literals(source)
+    required = (
+        ("bsp_audio_codec_speaker_init()", r"\bbsp_audio_codec_speaker_init\s*\(\s*\)"),
+        ("bsp_audio_codec_microphone_init()", r"\bbsp_audio_codec_microphone_init\s*\(\s*\)"),
+        ("esp_codec_dev_read(", r"\besp_codec_dev_read\s*\("),
+        ("esp_codec_dev_write(", r"\besp_codec_dev_write\s*\("),
+        (".channel = 2", r"\.channel\s*=\s*2\b"),
+        (".channel_mask = 0x03", r"\.channel_mask\s*=\s*0x0*3\b"),
+        ("CONFIG_EXAMPLE_MODE_ECHO", r"\bCONFIG_EXAMPLE_MODE_ECHO\b"),
+    )
+    errors = [
+        f"06_I2SCodec: missing board-codec path {label}"
+        for label, pattern in required
+        if re.search(pattern, active_source) is None
+    ]
+    for label, pattern in (
+        ("BSP_I2S_GPIO_CFG", r"\bBSP_I2S_GPIO_CFG\b"),
+        ("bsp_audio_poweramp_enable", r"\bbsp_audio_poweramp_enable\s*\("),
+        ("i2s_channel_read(", r"\bi2s_channel_read\s*\("),
+        ("i2s_channel_write(", r"\bi2s_channel_write\s*\("),
+    ):
+        if re.search(pattern, active_source):
+            errors.append(f"06_I2SCodec: obsolete raw/BSP-private audio path {label}")
+    if re.search(r"(?m)^CONFIG_EXAMPLE_MODE_ECHO=y[ \t]*$", overlay) is None:
+        errors.append("06_I2SCodec: echo CI overlay must enable the microphone path")
+    if re.search(r"(?m)^#define\s+EXAMPLE_MCLK_MULTIPLE\s+\(256\)[ \t]*$", config) is None:
+        errors.append("06_I2SCodec: BSP codec and I2S must use the same 256x MCLK contract")
     return errors
 
 
@@ -359,13 +483,25 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
             errors.append(f"{relative}: missing product sdkconfig.defaults")
             continue
         text = defaults.read_text(encoding="utf-8")
-        if text.count("CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y") != 1:
-            errors.append(f"{relative}: expected exactly one 32MB flash selection")
-        if "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y" in text:
-            errors.append(f"{relative}: conflicting 16MB flash selection")
+        errors.extend(flash_size_selection_errors(text, relative))
+        errors.extend(duplicate_sdkconfig_assignment_errors(text, relative))
         for stale_key in ("CONFIG_BSP_LCD_TYPE_HDMI", "CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A"):
             if stale_key in text:
                 errors.append(f"{relative}: stale non-product setting {stale_key}")
+
+    wifi_source = (
+        repo_root / "examples" / "esp-idf" / "04_wifistation" / "main" / "station_example_main.c"
+    ).read_text(encoding="utf-8")
+    errors.extend(wifi_public_log_errors(wifi_source))
+
+    audio_source = (
+        repo_root / "examples" / "esp-idf" / "06_I2SCodec" / "main" / "i2s_es8311_example.c"
+    ).read_text(encoding="utf-8")
+    audio_config = (
+        repo_root / "examples" / "esp-idf" / "06_I2SCodec" / "main" / "example_config.h"
+    ).read_text(encoding="utf-8")
+    audio_overlay = (repo_root / "config" / "ci" / "i2s_echo.defaults").read_text(encoding="utf-8")
+    errors.extend(audio_bsp_contract_errors(audio_source, audio_overlay, audio_config))
 
     player_source = (
         repo_root / "examples" / "esp-idf" / "10_mp4_player" / "main" / "main.c"
@@ -450,9 +586,7 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     ).read_text(encoding="utf-8")
     errors.extend(brookesia_ai_compatibility_errors(brookesia_cmake, coze_source))
 
-    firmware = sorted((repo_root / "firmware").glob("*.bin"))
-    if len(firmware) != 1:
-        errors.append(f"expected one immutable factory firmware binary, found {len(firmware)}")
+    errors.extend(factory_firmware_integrity_errors(repo_root))
 
     errors.extend(local_link_errors(repo_root))
     return errors

@@ -12,9 +12,11 @@ the repository's compile gate. It runs for every pull request, every push to
 | --- | --- |
 | Direct example source under `examples/esp-idf/<project>/` | Build that project and its applicable conditional lanes |
 | Workflow, CI helper, CI test, or `config/ci/` change | Build the complete matrix |
-| Documentation, product assets, schematic, or templates only | Run preflight checks; create no ESP-IDF build jobs |
+| Markdown or the two reviewed documentation assets only | Run preflight checks with a docs-only assertion; create no ESP-IDF build jobs |
+| Governance templates, license, or ignore rules only | Run preflight checks without claiming a docs-only diff; create no ESP-IDF build jobs |
+| Markdown-audit policy or another unclassified non-document path | Report the path and run the complete matrix conservatively |
 | Checked-in factory firmware | Run preflight checks and flag release-owner review; do not treat the binary as an example |
-| Unclassified path | Report the path and run the complete matrix conservatively |
+| Other unclassified path | Report the path and run the complete matrix conservatively |
 | Empty or unreadable Git diff | Fail the routing job instead of guessing |
 
 Renames are classified from both the old and new path. Pull requests compare
@@ -25,17 +27,19 @@ component test applications are not promoted to product examples.
 ## Build matrix
 
 The default matrix compiles all 12 product examples with ESP-IDF `v5.5.5` and
-`v6.0.2`, producing 24 jobs. A full source-impact run also contains 15 focused
+`v6.0.2`, producing 24 jobs. A full source-impact run also contains 18 focused
 jobs:
 
+- 2 ES7210-to-ES8311 echo jobs for example 06, one on each ESP-IDF version;
 - 12 RGB888 jobs for examples 07 through 12 on both ESP-IDF versions;
-- 1 AI-enabled Brookesia job for example 11 on ESP-IDF `v5.5.5`;
+- 2 AI-enabled Brookesia jobs for example 11, one on each ESP-IDF version;
 - 2 USB-minimal jobs with HID touch and UAC audio disabled for example 12.
 
-That makes 39 ESP-IDF build jobs in a complete matrix. Brookesia AI is not
-scheduled on ESP-IDF 6 because its current GMF 0.6 dependency set is not
-compatible with the IDF 6 component-requirements pass; the IDF 6 default keeps
-AI disabled. The overlays in
+That makes 42 ESP-IDF build jobs in a complete matrix. The audio echo overlay
+compiles the board's ES7210 microphone and ES8311 speaker path on both supported
+ESP-IDF lines. The Brookesia AI overlay
+compiles the same optional dependency path on both supported ESP-IDF lines;
+the product default keeps AI disabled to bound runtime resources. The overlays in
 [`config/ci/`](../config/ci/) are appended after each project's
 `sdkconfig.defaults`; they exist only to compile conditional paths and are not
 factory firmware configurations. The USB-minimal lane keeps UAC audio disabled;

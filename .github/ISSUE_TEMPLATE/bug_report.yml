@@ -12,11 +12,35 @@ body:
       placeholder: ESP32-P4-WIFI6-Touch-LCD-4.3, revision shown on the PCB
     validations:
       required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem summary
+      description: Briefly describe what is wrong and when it started.
+    validations:
+      required: true
   - type: input
     id: example
     attributes:
       label: Example path
       placeholder: examples/esp-idf/09_video_lcd_display
+    validations:
+      required: true
+  - type: dropdown
+    id: firmware_source
+    attributes:
+      label: Software or firmware source
+      options:
+        - Source-built from this repository or a CI artifact
+        - Checked-in factory or recovery image
+        - Another documented image
+    validations:
+      required: true
+  - type: input
+    id: build_identity
+    attributes:
+      label: Build or image identity
+      description: Provide the source commit and configuration, CI artifact name, or exact factory/recovery filename.
     validations:
       required: true
   - type: input
