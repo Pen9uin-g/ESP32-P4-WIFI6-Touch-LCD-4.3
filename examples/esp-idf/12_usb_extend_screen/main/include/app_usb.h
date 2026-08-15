@@ -29,12 +29,12 @@ typedef struct {
     uint16_t height;
 } __attribute__((packed)) touch_report_t;
 
-_Static_assert(CONFIG_ESP_LCD_TOUCH_MAX_POINTS == 5, "CONFIG_ESP_LCD_TOUCH_MAX_POINTS must be 5");
+#define USB_HID_TOUCH_MAX_POINTS 1
 
 typedef struct {
     uint32_t report_id;    // Report identifier
     struct {
-        touch_report_t data[CONFIG_ESP_LCD_TOUCH_MAX_POINTS];  // Touch report
+        touch_report_t data[USB_HID_TOUCH_MAX_POINTS];  // Touch report
         // uint16_t scan_time;
         uint8_t cnt;
     } touch_report;
@@ -55,13 +55,14 @@ esp_err_t app_usb_init(void);
  *
  * @param report hid report data
  */
-void tinyusb_hid_keyboard_report(hid_report_t report);
+esp_err_t tinyusb_hid_keyboard_report(hid_report_t report);
 
 esp_err_t app_hid_init(void);
 #endif
 
 #if CFG_TUD_VENDOR
 esp_err_t app_vendor_init(void);
+void app_vendor_reset(void);
 #endif
 
 #if CFG_TUD_AUDIO

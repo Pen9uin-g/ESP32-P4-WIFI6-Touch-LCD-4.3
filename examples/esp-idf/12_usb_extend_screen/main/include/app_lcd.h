@@ -27,6 +27,8 @@ extern "C" {
 #define EXAMPLE_LCD_BIT_PER_PIXEL           (16)
 #elif CONFIG_LCD_PIXEL_FORMAT_RGB888
 #define EXAMPLE_LCD_BIT_PER_PIXEL           (24)
+#else
+#error "Select CONFIG_LCD_PIXEL_FORMAT_RGB565 or CONFIG_LCD_PIXEL_FORMAT_RGB888"
 #endif
 
 #define EXAMPLE_LCD_BUF_LEN                 EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES * EXAMPLE_LCD_BIT_PER_PIXEL / 8
@@ -43,7 +45,7 @@ extern "C" {
  */
 esp_err_t app_lcd_init(void);
 
-void app_lcd_draw(uint8_t *buf, uint32_t len, uint16_t width, uint16_t height);
+esp_err_t app_lcd_draw(uint8_t *buf, uint32_t len, uint16_t width, uint16_t height);
 
 #ifdef __cplusplus
 }

@@ -12,6 +12,7 @@
 #include "esp_heap_caps.h"
 #include "esp_private/esp_cache_private.h"
 #include "esp_timer.h"
+#include <unistd.h>
 #include "driver/ppa.h"
 #include "app_video.h"
 
@@ -46,6 +47,16 @@ i2c_master_bus_handle_t i2c_bus_;
 
 static bool dummy_draw_enabled = true;
 static bool dummy_mode_delay_flag = false;
+
+static void free_camera_buffers(void **buffers, size_t count)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (buffers[i] != NULL) {
+            heap_caps_free(buffers[i]);
+            buffers[i] = NULL;
+        }
+    }
+}
 
 static void calc_ppa_input_offset(uint32_t src_w, uint32_t src_h,
                                   uint32_t dst_w, uint32_t dst_h,
@@ -101,7 +112,7 @@ void app_main(void)
         &lcd_buffer[0], &lcd_buffer[1], &lcd_buffer[2]));
 
     ESP_LOGI(TAG, "Using user defined buffer");
-    void *camera_buf[2];
+    void *camera_buf[2] = {NULL};
     for (int i = 0; i < 2; i++)
     {
         camera_buf[i] = heap_caps_aligned_calloc(
@@ -109,12 +120,35 @@ void app_main(void)
             1,
             app_video_get_buf_size(),
             MALLOC_CAP_SPIRAM);
+        if (camera_buf[i] == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate camera buffer %d", i);
+            free_camera_buffers(camera_buf, 2);
+            close(video_cam_fd0);
+            return;
+        }
     }
-    ESP_ERROR_CHECK(app_video_set_bufs(video_cam_fd0, 2, (void *)camera_buf));
+    ret = app_video_set_bufs(video_cam_fd0, 2, (const void **)camera_buf);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure camera buffers: %s", esp_err_to_name(ret));
+        free_camera_buffers(camera_buf, 2);
+        return;
+    }
 
-    ESP_ERROR_CHECK(app_video_register_frame_operation_cb(camera_video_frame_operation));
+    ret = app_video_register_frame_operation_cb(camera_video_frame_operation);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register video frame callback: %s", esp_err_to_name(ret));
+        close(video_cam_fd0);
+        free_camera_buffers(camera_buf, 2);
+        return;
+    }
 
-    ESP_ERROR_CHECK(app_video_stream_task_start(video_cam_fd0, 0, NULL));
+    ret = app_video_stream_task_start(video_cam_fd0, 0, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start video stream task: %s", esp_err_to_name(ret));
+        close(video_cam_fd0);
+        free_camera_buffers(camera_buf, 2);
+        return;
+    }
 
 }
 

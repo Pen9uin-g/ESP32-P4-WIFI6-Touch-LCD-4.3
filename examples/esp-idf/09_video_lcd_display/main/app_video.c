@@ -24,6 +24,7 @@ static const char *TAG = "app_video";
 #define MIN_BUFFER_COUNT                (2)
 #define VIDEO_TASK_STACK_SIZE           (4 * 1024)
 #define VIDEO_TASK_PRIORITY             (4)
+#define VIDEO_TASK_STOP_TIMEOUT_MS      (2000)
 
 typedef struct {
     uint8_t *camera_buffer[MAX_BUFFER_COUNT];
@@ -35,8 +36,11 @@ typedef struct {
     uint8_t camera_mem_mode;
     app_video_frame_operation_cb_t user_camera_video_frame_operation_cb;
     TaskHandle_t video_stream_task_handle;
+    SemaphoreHandle_t video_task_stopped_sem;
+    esp_err_t video_task_stop_result;
+    int video_fd;
     uint8_t video_task_core_id;
-    bool video_task_delete;
+    volatile bool video_task_delete;
     void *video_task_user_data;
 } app_video_t;
 
@@ -297,6 +301,9 @@ static inline esp_err_t video_stream_start(int video_fd)
     format.type = type;
     if (ioctl(video_fd, VIDIOC_G_FMT, &format) != 0) {
         ESP_LOGE(TAG, "get fmt failed");
+        if (ioctl(video_fd, VIDIOC_STREAMOFF, &type) != 0) {
+            ESP_LOGE(TAG, "failed to roll back stream after get fmt failure");
+        }
         goto errout;
     }
 
@@ -324,7 +331,8 @@ errout:
 
 static void video_stream_task(void *arg)
 {
-    int video_fd = *((int *)arg);
+    app_video_t *video = (app_video_t *)arg;
+    int video_fd = video->video_fd;
 
     while (1) {
         ESP_ERROR_CHECK(video_receive_video_frame(video_fd));
@@ -335,7 +343,8 @@ static void video_stream_task(void *arg)
 
         if (app_camera_video.video_task_delete) {
             app_camera_video.video_task_delete = false;
-            ESP_ERROR_CHECK(video_stream_stop(video_fd));
+            app_camera_video.video_task_stop_result = video_stream_stop(video_fd);
+            xSemaphoreGive(app_camera_video.video_task_stopped_sem);
             vTaskDelete(NULL);
         }
     }
@@ -344,12 +353,29 @@ static void video_stream_task(void *arg)
 
 esp_err_t app_video_stream_task_start(int video_fd, int core_id, void *user_data)
 {
+    if (app_camera_video.video_stream_task_handle != NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (app_camera_video.video_task_stopped_sem == NULL) {
+        app_camera_video.video_task_stopped_sem = xSemaphoreCreateBinary();
+        if (app_camera_video.video_task_stopped_sem == NULL) {
+            return ESP_ERR_NO_MEM;
+        }
+    }
+    xSemaphoreTake(app_camera_video.video_task_stopped_sem, 0);
+    app_camera_video.video_task_delete = false;
+    app_camera_video.video_task_stop_result = ESP_OK;
     app_camera_video.video_task_core_id = core_id;
     app_camera_video.video_task_user_data = user_data;
 
-    video_stream_start(video_fd);
+    esp_err_t ret = video_stream_start(video_fd);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
-    BaseType_t result = xTaskCreatePinnedToCore(video_stream_task, "video stream task", VIDEO_TASK_STACK_SIZE, &video_fd, VIDEO_TASK_PRIORITY, &app_camera_video.video_stream_task_handle, core_id);
+    app_camera_video.video_fd = video_fd;
+    BaseType_t result = xTaskCreatePinnedToCore(video_stream_task, "video stream task", VIDEO_TASK_STACK_SIZE, &app_camera_video, VIDEO_TASK_PRIORITY, &app_camera_video.video_stream_task_handle, core_id);
 
     if (result != pdPASS) {
         ESP_LOGE(TAG, "failed to create video stream task");
@@ -359,15 +385,28 @@ esp_err_t app_video_stream_task_start(int video_fd, int core_id, void *user_data
     return ESP_OK;
 
 errout:
-    video_stream_stop(video_fd);
+    app_camera_video.video_stream_task_handle = NULL;
+    if (video_stream_stop(video_fd) != ESP_OK) {
+        ESP_LOGE(TAG, "failed to roll back video stream");
+    }
     return ESP_FAIL;
 }
 
 esp_err_t app_video_stream_task_restart(int video_fd)
 {
-    app_video_set_bufs(video_fd, app_camera_video.camera_buf_count, (const void **)app_camera_video.camera_buffer);
+    esp_err_t ret = app_video_stream_task_stop(video_fd);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "failed to stop video stream task before restart");
+        return ret;
+    }
 
-    esp_err_t ret = app_video_stream_task_start(video_fd, app_camera_video.video_task_core_id, app_camera_video.video_task_user_data);
+    ret = app_video_set_bufs(video_fd, app_camera_video.camera_buf_count, (const void **)app_camera_video.camera_buffer);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "failed to restore video buffers");
+        return ret;
+    }
+
+    ret = app_video_stream_task_start(video_fd, app_camera_video.video_task_core_id, app_camera_video.video_task_user_data);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "failed to restart video stream task");
         goto errout;
@@ -381,9 +420,23 @@ errout:
 
 esp_err_t app_video_stream_task_stop(int video_fd)
 {
+    if (app_camera_video.video_stream_task_handle == NULL) {
+        return ESP_OK;
+    }
+    if (video_fd != app_camera_video.video_fd) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     app_camera_video.video_task_delete = true;
 
-    return ESP_OK;
+    if (xSemaphoreTake(app_camera_video.video_task_stopped_sem,
+                       pdMS_TO_TICKS(VIDEO_TASK_STOP_TIMEOUT_MS)) != pdTRUE) {
+        ESP_LOGE(TAG, "timed out waiting for video stream task to stop");
+        return ESP_ERR_TIMEOUT;
+    }
+
+    app_camera_video.video_stream_task_handle = NULL;
+    return app_camera_video.video_task_stop_result;
 }
 
 esp_err_t app_video_register_frame_operation_cb(app_video_frame_operation_cb_t operation_cb)

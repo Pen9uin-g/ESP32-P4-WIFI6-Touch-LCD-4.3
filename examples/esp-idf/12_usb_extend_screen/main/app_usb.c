@@ -18,24 +18,30 @@
 #include "app_usb.h"
 
 static const char *TAG = "app_usb";
+static usb_phy_handle_t s_phy_handle = NULL;
 
 //--------------------------------------------------------------------+
 // USB PHY config
 //--------------------------------------------------------------------+
-static void usb_phy_init(void)
+static esp_err_t usb_phy_init(void)
 {
-    usb_phy_handle_t phy_hdl;
+    if (s_phy_handle) {
+        return ESP_OK;
+    }
+
     // Configure USB PHY
     usb_phy_config_t phy_conf = {
         .controller = USB_PHY_CTRL_OTG,
         .otg_mode = USB_OTG_MODE_DEVICE,
     };
     phy_conf.target = USB_PHY_TARGET_INT;
-    usb_new_phy(&phy_conf, &phy_hdl);
+    return usb_new_phy(&phy_conf, &s_phy_handle);
 }
 
 static void tusb_device_task(void *arg)
 {
+    (void)arg;
+
     while (1) {
         tud_task();
     }
@@ -43,9 +49,7 @@ static void tusb_device_task(void *arg)
 
 esp_err_t app_usb_init(void)
 {
-    esp_err_t ret = ESP_OK;
-
-    usb_phy_init();
+    ESP_RETURN_ON_ERROR(usb_phy_init(), TAG, "USB PHY initialization failed");
     bool usb_init = tusb_init();
     if (!usb_init) {
         ESP_LOGE(TAG, "USB Device Stack Init Fail");
@@ -53,34 +57,40 @@ esp_err_t app_usb_init(void)
     }
 
 #if CFG_TUD_VENDOR
-    ret = app_vendor_init();
-    ESP_RETURN_ON_FALSE(ret == ESP_OK, ESP_FAIL, TAG, "app_vendor_init failed");
+    ESP_RETURN_ON_ERROR(app_vendor_init(), TAG, "app_vendor_init failed");
 #endif
 
 #if CFG_TUD_HID
-    ret = app_hid_init();
-    ESP_RETURN_ON_FALSE(ret == ESP_OK, ESP_FAIL, TAG, "app_hid_init failed");
+    ESP_RETURN_ON_ERROR(app_hid_init(), TAG, "app_hid_init failed");
 #endif
 
 #if CFG_TUD_AUDIO
-    ret =  app_uac_init();
-    ESP_RETURN_ON_FALSE(ret == ESP_OK, ESP_FAIL, TAG, "app_uac_init failed");
+    ESP_RETURN_ON_ERROR(app_uac_init(), TAG, "app_uac_init failed");
 #endif
 
-    xTaskCreate(tusb_device_task, "tusb_device_task", 4096, NULL, CONFIG_USB_TASK_PRIORITY, NULL);
-    return ret;
+    BaseType_t task_created = xTaskCreate(tusb_device_task, "tusb_device_task", 4096, NULL,
+                                          CONFIG_USB_TASK_PRIORITY, NULL);
+    ESP_RETURN_ON_FALSE(task_created == pdPASS, ESP_ERR_NO_MEM, TAG, "USB task creation failed");
+    return ESP_OK;
 }
 
 /************************************************** TinyUSB callbacks ***********************************************/
 // Invoked when device is mounted
 void tud_mount_cb(void)
 {
+#if CFG_TUD_VENDOR
+    // BUS_RESET can start a new host session without an umount callback.
+    app_vendor_reset();
+#endif
     ESP_LOGI(TAG, "USB Mount");
 }
 
 // Invoked when device is unmounted
 void tud_umount_cb(void)
 {
+#if CFG_TUD_VENDOR
+    app_vendor_reset();
+#endif
     ESP_LOGI(TAG, "USB Un-Mount");
 }
 

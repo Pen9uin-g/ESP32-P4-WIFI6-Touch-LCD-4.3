@@ -9,7 +9,6 @@
 #include "lvgl.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
-#include "bsp_board_extra.h"
 #include "lv_demos.h"
 
 void app_main(void)

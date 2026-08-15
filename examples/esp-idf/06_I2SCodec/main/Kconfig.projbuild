@@ -9,7 +9,6 @@ menu "Example Configuration"
         config EXAMPLE_MODE_MUSIC
             bool "music"
         config EXAMPLE_MODE_ECHO
-            depends on !EXAMPLE_BSP
             bool "echo"
     endchoice
 
@@ -41,13 +40,13 @@ menu "Example Configuration"
     config EXAMPLE_MIC_GAIN
         int
         default 0 if MIC_GAIN_0DB
-        default 1 if MIC_GAIN_6DB
-        default 2 if MIC_GAIN_12DB
-        default 3 if MIC_GAIN_18DB
-        default 4 if MIC_GAIN_24DB
-        default 5 if MIC_GAIN_30DB
-        default 6 if MIC_GAIN_36DB
-        default 7 if MIC_GAIN_42DB
+        default 6 if MIC_GAIN_6DB
+        default 12 if MIC_GAIN_12DB
+        default 18 if MIC_GAIN_18DB
+        default 24 if MIC_GAIN_24DB
+        default 30 if MIC_GAIN_30DB
+        default 36 if MIC_GAIN_36DB
+        default 42 if MIC_GAIN_42DB
 
     config EXAMPLE_VOICE_VOLUME
         int "Voice volume"
@@ -56,9 +55,4 @@ menu "Example Configuration"
         help
             Set voice volume
 
-    config EXAMPLE_BSP
-        bool "Enable Board Support Package (BSP) support"
-        default n
-        help
-            Use BSP to setup all hardware settings. Specific board must be selected in main/idf_component.yml file.
 endmenu

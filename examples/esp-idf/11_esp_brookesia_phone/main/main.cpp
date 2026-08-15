@@ -55,7 +55,12 @@ If you need to use the three-cache anti-tear configuration, you need to fix idf 
 
     /* Try using a stylesheet that corresponds to the resolution */
     Stylesheet *stylesheet = nullptr;
-    if ((BSP_LCD_H_RES == 1024) && (BSP_LCD_V_RES == 600))
+    if ((BSP_LCD_H_RES == 480) && (BSP_LCD_V_RES == 800))
+    {
+        stylesheet = new (std::nothrow) Stylesheet(STYLESHEET_480_800_DARK);
+        ESP_UTILS_CHECK_NULL_EXIT(stylesheet, "Create stylesheet failed");
+    }
+    else if ((BSP_LCD_H_RES == 1024) && (BSP_LCD_V_RES == 600))
     {
         stylesheet = new (std::nothrow) Stylesheet(STYLESHEET_1024_600_DARK);
         ESP_UTILS_CHECK_NULL_EXIT(stylesheet, "Create stylesheet failed");

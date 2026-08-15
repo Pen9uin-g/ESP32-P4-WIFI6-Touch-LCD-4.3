@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
 
@@ -27,6 +28,8 @@ typedef struct {
 } frame_t;
 
 esp_err_t frame_allocate(int nb_of_fb, size_t fb_size);
+
+void frame_deallocate(void);
 
 void frame_reset(frame_t *frame);
 

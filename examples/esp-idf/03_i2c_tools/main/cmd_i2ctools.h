@@ -13,6 +13,7 @@ extern "C" {
 #endif
 
 void register_i2ctools(void);
+void i2ctools_set_bus_config(const i2c_master_bus_config_t *config);
 
 extern i2c_master_bus_handle_t tool_bus_handle;
 

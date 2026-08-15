@@ -7,6 +7,6 @@ idf_component_register(SRCS ${srcs}
 
 if(NOT CONFIG_SOC_SDMMC_HOST_SUPPORTED)
     fail_at_build_time(sdmmc ""
-                             "Only ESP32 and ESP32-S3 targets are supported."
-                             "Please refer README.md for more details")
+                             "This target does not provide an SDMMC host."
+                             "Select a target with SOC_SDMMC_HOST_SUPPORTED.")
 endif()

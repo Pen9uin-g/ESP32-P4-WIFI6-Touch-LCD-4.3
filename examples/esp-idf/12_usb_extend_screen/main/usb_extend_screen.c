@@ -21,9 +21,9 @@ static const char *TAG = "usb_extend_screen";
 void app_main(void)
 {
     ESP_LOGI(TAG, "USB extend screen example");
-    app_usb_init();
-    app_lcd_init();
+    ESP_ERROR_CHECK(app_lcd_init());
+    ESP_ERROR_CHECK(app_usb_init());
 #if CONFIG_HID_TOUCH_ENABLE
-    app_touch_init();
+    ESP_ERROR_CHECK(app_touch_init());
 #endif
 }
