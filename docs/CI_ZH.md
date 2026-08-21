@@ -17,6 +17,7 @@
 | Markdown 审计策略或其他未分类的非文档路径 | 报告该路径并保守运行完整矩阵 |
 | 仓库内的出厂固件 | 运行预检并提示发布负责人审核，不把二进制当作示例构建 |
 | 其他无法分类的路径 | 报告路径并保守运行完整矩阵 |
+| 基准 SHA 全为零的首次/重建推送 | 运行完整矩阵，不只检查最末提交 |
 | Git 差异为空或无法读取 | 路由任务失败，不猜测构建范围 |
 
 重命名会同时按旧路径和新路径分类。Pull Request 使用基准提交与 PR 头提交比较，
@@ -27,6 +28,14 @@
 
 默认矩阵使用 ESP-IDF `v5.5.5` 与 `v6.0.2` 编译全部 12 个产品工程，共 24 个任务。
 完整源码影响运行还包含 17 个定向任务：
+
+每个产品的 `sdkconfig.defaults` 都默认使用 Rev3.x，且每个默认任务仍会追加
+`config/ci/rev3_x.defaults` 作为显式的 CI 断言。`config/ci/rev1_3.defaults` 覆盖层可用于
+Rev1.3：在示例目录中执行
+`idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;../../../config/ci/rev1_3.defaults" build`。
+它选择旧版 P4 芯片和 200 MHz PSRAM。待合并的 PR #191 BSP 更新会让 ESP-IDF 为每个配置
+选择匹配的 MIPI PHY 参考时钟。manifest 中的旧临时 Git 锁定不含 Rev3.x 修复，必须在产品
+CI 可作为最终运行兼容证据前切换到已发布 Registry 版本。
 
 - 示例 06 在两个 ESP-IDF 版本下各有 1 个 ES7210 至 ES8311 回声任务，共 2 个；
 - 示例 07 至 12 在两个 ESP-IDF 版本下的 12 个 RGB888 任务；
@@ -44,6 +53,9 @@ ESP-IDF v6.0 在早期的 `component_get_requirements` 阶段会拒绝该调用�
 USB 最小通道会关闭 UAC 音频；`usb_device_uac` 会下载，但只在启用 UAC 音频时链接。
 较旧 IDF 的构建图仍可能编译未链接目标。顶层 `project()` 创建托管组件目标后，`TARGET`
 守卫仅为该 UAC 目标私有地定义 TinyUSB 音频；这不会启用产品描述符或应用音频。
+
+全部产品默认配置将 bootloader 日志保持为 `WARN`。这样无需改变现有分区布局，也能让
+Rev3.x QIO bootloader 保持在 `0x8000` 分区表之前的 `0x6000` 区域内；应用日志级别不变。
 
 ## CI 固件产物
 
@@ -63,3 +75,14 @@ PR 头 SHA（或 push SHA），包含校验和及由清单导出的偏移，且�
 - 出厂发布打包、烧录偏移或升级兼容性正确。
 
 这些结论需要绑定到精确提交和硬件版本的独立实板或发布证据。
+
+## Arduino 示例
+
+独立的 Arduino 工作流使用 Arduino-ESP32 `3.3.11` 与有效的 P4
+`ChipVariant=postv3` FQBN，在 `examples/arduino/examples/` 下每个目录发现一个规范
+`.ino` 文件。其内置 P4 库为 `REV_MIN_301`/200 MHz PSRAM，因此该工作流要求 Rev3.1 或更新
+版本，不声明 Rev3.0 或 ESP-IDF 的 250 MHz 配置。Pull Request 和推送中的示例局部源码变更
+只选择对应示例；仓库内共享显示库或 Arduino 工作流/发现契约变更才选择全部 10 项。仅文档或
+仅 ESP-IDF 变更仍运行预检，但不会创建 Arduino 编译任务；无法分类的 Arduino 路径会保守选择
+全部 10 项。手动触发可选择单个示例或全部示例。仅 Arduino 源码路径的变更不会选择 ESP-IDF
+矩阵。本仓库不声明 CAN 或 485 板载功能。

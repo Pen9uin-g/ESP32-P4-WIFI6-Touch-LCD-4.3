@@ -11,6 +11,7 @@
     <a href="https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-4.3">📚 Documentation</a> ·
     <a href="firmware/">📦 Factory Firmware</a> ·
     <a href="examples/esp-idf/">🧩 ESP-IDF Examples</a> ·
+    <a href="examples/arduino/README.md">🔧 Arduino Examples</a> ·
     <a href="docs/README.md">📖 Repository Guide</a>
   </p>
   <img src="assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3" width="600">
@@ -49,6 +50,23 @@ For complete specifications, connector details, and safe operating guidance,
 see the [official product documentation](https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-4.3).
 CI proves source compatibility only; hardware pin and timing validation should
 also use the schematic and the board revision in hand.
+
+### ESP32-P4 silicon profiles
+
+The default ESP-IDF profile is `rev3_x`: it requires `CONFIG_ESP32P4_REV_MIN_300`
+and uses 250 MHz PSRAM. Rev1.3 boards remain supported through the explicit
+`config/ci/rev1_3.defaults` compatibility overlay, which selects
+`CONFIG_ESP32P4_REV_MIN_100` and 200 MHz PSRAM. The pending PR #191 BSP update
+leaves MIPI PHY clock selection to ESP-IDF's revision-aware default; do not copy
+a clock-source setting between profiles. Examples 06–12 still retain the old
+temporary Git source pin and are not Rev3.x runtime-ready until the fixed BSP is
+published and selected from the Registry. A successful compile does not
+validate panel timing on a physical board.
+
+Arduino-ESP32 `3.3.11` is a separate prebuilt-core profile: its
+`ChipVariant=postv3` libraries resolve to `CONFIG_ESP32P4_REV_MIN_301` and
+200 MHz PSRAM. Arduino examples therefore require P4 Rev3.1 or newer; they do
+not support Rev3.0 and do not use the ESP-IDF 250 MHz PSRAM profile.
 
 ## 📦 Factory Firmware
 
@@ -101,11 +119,18 @@ the complete matrix, while an empty or unreadable diff fails closed. See the
 Successful example-CI lanes also upload a SHA-bound flash package for their
 specific project, ESP-IDF version, and variant. See [CI firmware artifacts](docs/CI_FIRMWARE.md).
 
+The Arduino examples use Arduino-ESP32 `3.3.11` with
+`ChipVariant=postv3`. That core's bundled P4 configuration is Rev3.1-or-newer
+with 200 MHz PSRAM, rather than the ESP-IDF Rev3.x 250 MHz profile. The ten
+sketches are discovered below `examples/arduino/examples/`; the repository does
+not claim onboard CAN or RS485 functionality.
+
 ## 🗂️ Repository Layout
 
 | Path | Purpose |
 | --- | --- |
 | [`examples/esp-idf/`](examples/esp-idf/) | First-party ESP-IDF projects |
+| [`examples/arduino/`](examples/arduino/) | First-party Arduino sketches and board display adapter |
 | [`firmware/`](firmware/) | Checked-in factory and recovery image |
 | [`schematic/`](schematic/) | Product schematic |
 | [`assets/`](assets/) | Product images used by the documentation |
@@ -119,6 +144,7 @@ specific project, ESP-IDF version, and variant. See [CI firmware artifacts](docs
 - [中文产品文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)
 - [Product Schematic](schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf)
 - [ESP-IDF Examples](examples/esp-idf/)
+- [Arduino Examples](examples/arduino/README.md)
 - [Repository Guide](docs/README.md)
 - [Continuous Integration](docs/CI.md)
 - [CI Firmware Artifacts](docs/CI_FIRMWARE.md)

@@ -10,6 +10,8 @@
   dependency ownership rules.
 - [Hardware audit](HARDWARE.md): schematic-backed interfaces, pin mappings, and
   items that still require physical-board confirmation.
+- [Arduino examples](../examples/arduino/README.md): supported core profile,
+  dependencies, example inventory, and hardware-test boundaries.
 - [Contributing](../CONTRIBUTING.md): change scope, validation, and pull-request
   expectations.
 - [Support](../SUPPORT.md): where to report reproducible product issues.

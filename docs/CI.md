@@ -17,6 +17,7 @@ the repository's compile gate. It runs for every pull request, every push to
 | Markdown-audit policy or another unclassified non-document path | Report the path and run the complete matrix conservatively |
 | Checked-in factory firmware | Run preflight checks and flag release-owner review; do not treat the binary as an example |
 | Other unclassified path | Report the path and run the complete matrix conservatively |
+| Initial/recreated push with an all-zero base SHA | Run the complete matrix instead of inspecting only the tip commit |
 | Empty or unreadable Git diff | Fail the routing job instead of guessing |
 
 Renames are classified from both the old and new path. Pull requests compare
@@ -29,6 +30,17 @@ component test applications are not promoted to product examples.
 The default matrix compiles all 12 product examples with ESP-IDF `v5.5.5` and
 `v6.0.2`, producing 24 jobs. A full source-impact run also contains 17 focused
 jobs:
+
+Every product `sdkconfig.defaults` is Rev3.x by default, and every default lane
+also appends `config/ci/rev3_x.defaults` as an explicit CI assertion. The
+explicit `config/ci/rev1_3.defaults` overlay remains runnable for Rev1.3:
+from an example directory run
+`idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;../../../config/ci/rev1_3.defaults" build`.
+It selects the older P4 revision and 200 MHz PSRAM. The pending PR #191 BSP
+update lets ESP-IDF choose the matching MIPI PHY reference clock for each
+profile. The manifests' old temporary Git pin does not contain that Rev3.x fix,
+so it must be replaced by the published Registry release before product CI can
+be treated as final runtime-compatible evidence.
 
 - 2 ES7210-to-ES8311 echo jobs for example 06, one on each ESP-IDF version;
 - 12 RGB888 jobs for examples 07 through 12 on both ESP-IDF versions;
@@ -51,6 +63,11 @@ IDF build graphs can still compile its unlinked target. After top-level
 `project()` creates managed component targets, a `TARGET` guard gives only that
 UAC target a private TinyUSB audio definition. It does not enable product
 descriptors or app audio.
+
+All product defaults keep bootloader logging at `WARN`. This preserves the
+existing partition layout while keeping the Rev3.x QIO bootloader inside the
+`0x6000` region before the partition table at `0x8000`; application logging is
+unchanged.
 
 ## CI firmware artifacts
 
@@ -75,3 +92,18 @@ dependencies and compiled in the official ESP-IDF CI container for target
 
 Those claims require separate hardware or release evidence tied to the exact
 commit and board revision.
+
+## Arduino examples
+
+The separate Arduino workflow uses Arduino-ESP32 `3.3.11` with the valid P4
+`ChipVariant=postv3` FQBN and discovers one canonical sketch in each directory
+below `examples/arduino/examples/`. Its bundled P4 libraries are
+`REV_MIN_301`/200 MHz PSRAM, so this workflow requires Rev3.1 or newer and does
+not claim Rev3.0 or the ESP-IDF 250 MHz profile. On pull requests and pushes a
+sketch-local source change selects that sketch, while the shared display
+library or Arduino workflow/discovery contract selects all ten. Documentation-
+only and ESP-IDF-only changes keep the preflight job but create no Arduino
+compile jobs; an unclassified Arduino path conservatively selects all ten.
+Manual dispatch can select one sketch or all ten. Arduino-only source paths do
+not select the ESP-IDF matrix. The repository makes no CAN or RS485 hardware
+claim.

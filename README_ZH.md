@@ -11,6 +11,7 @@
     <a href="https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/">📚 产品文档</a> ·
     <a href="firmware/">📦 出厂固件</a> ·
     <a href="examples/esp-idf/">🧩 ESP-IDF 示例</a> ·
+    <a href="examples/arduino/README_ZH.md">🔧 Arduino 示例</a> ·
     <a href="docs/README_ZH.md">📖 仓库指南</a>
   </p>
   <img src="assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3" width="600">
@@ -46,6 +47,19 @@
 完整规格、接口说明和安全操作方法请参阅
 [官方产品文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-4.3/)。
 CI 仅证明源码编译兼容性；硬件引脚和时序还应结合原理图与实际硬件版本验证。
+
+### ESP32-P4 芯片版本配置
+
+ESP-IDF 默认配置使用 `rev3_x`：要求 `CONFIG_ESP32P4_REV_MIN_300`，并使用
+250 MHz PSRAM。Rev1.3 仍通过显式的 `config/ci/rev1_3.defaults` 兼容覆盖层支持，
+该覆盖层选择 `CONFIG_ESP32P4_REV_MIN_100` 和 200 MHz PSRAM。待合并的 PR #191 BSP 更新会将
+MIPI PHY 时钟选择交由 ESP-IDF 的芯片版本感知默认值处理；不要在不同配置之间复制时钟源设置。
+示例 06–12 仍保留旧的临时 Git 源码锁定，在修复版 BSP 发布并从 Registry 选用前，不能视为
+Rev3.x 实板运行就绪。编译通过不能代替实板屏幕时序验证。
+
+Arduino-ESP32 `3.3.11` 使用独立的预编译核心配置：`ChipVariant=postv3` 对应的库实际为
+`CONFIG_ESP32P4_REV_MIN_301` 和 200 MHz PSRAM。因此 Arduino 示例要求 P4 Rev3.1 或更新版本，
+不支持 Rev3.0，也不使用 ESP-IDF 的 250 MHz PSRAM 配置。
 
 ## 📦 出厂固件
 
@@ -94,11 +108,16 @@ ESP-IDF 示例固件。
 成功的示例 CI 通道还会上传绑定到对应工程、ESP-IDF 版本和变体的可烧录包。详见
 [CI 固件产物](docs/CI_FIRMWARE_ZH.md)。
 
+Arduino 示例使用 Arduino-ESP32 `3.3.11` 与 `ChipVariant=postv3`。该核心内置的 P4
+配置要求 Rev3.1 或更新版本，并使用 200 MHz PSRAM，而不是 ESP-IDF Rev3.x 的 250 MHz 配置；在
+`examples/arduino/examples/` 下发现 10 个示例。本仓库不声明板载 CAN 或 485 功能。
+
 ## 🗂️ 仓库结构
 
 | 路径 | 用途 |
 | --- | --- |
 | [`examples/esp-idf/`](examples/esp-idf/) | 第一方 ESP-IDF 工程 |
+| [`examples/arduino/`](examples/arduino/) | 第一方 Arduino 示例及本板显示适配层 |
 | [`firmware/`](firmware/) | 仓库内提供的出厂及恢复镜像 |
 | [`schematic/`](schematic/) | 产品原理图 |
 | [`assets/`](assets/) | 文档使用的产品图片 |
@@ -112,6 +131,7 @@ ESP-IDF 示例固件。
 - [English Product Documentation](https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-4.3)
 - [产品原理图](schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf)
 - [ESP-IDF 示例](examples/esp-idf/)
+- [Arduino 示例](examples/arduino/README_ZH.md)
 - [仓库指南](docs/README_ZH.md)
 - [持续集成](docs/CI_ZH.md)
 - [CI 固件产物](docs/CI_FIRMWARE_ZH.md)
