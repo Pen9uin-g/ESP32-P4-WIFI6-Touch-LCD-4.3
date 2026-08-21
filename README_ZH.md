@@ -22,7 +22,7 @@
 ## ✨ 概述
 
 本仓库提供适用于 Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 的 ESP-IDF 示例、
-出厂恢复镜像和产品原理图。
+对应日期版本的出厂固件源码、出厂恢复镜像和产品原理图。
 
 该开发板集成 ESP32-P4 应用处理器与 ESP32-C6 无线协处理器，并配备竖屏
 4.3 英寸电容触摸显示屏、音频输入输出、摄像头和 USB 接口、MicroSD 存储及
@@ -65,12 +65,22 @@ Arduino-ESP32 `3.3.11` 使用独立的预编译核心配置：`ChipVariant=postv
 
 ## 📦 出厂固件
 
-[`firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin`](firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin)
-是仓库中提供的出厂及恢复镜像。它不是示例构建工作流生成的产物，也不应被视为
-ESP-IDF 示例固件。
+[`firmware/brookesia/`](firmware/brookesia/) 包含对应日期版本的 ESP32-P4 Rev3.x
+出厂固件源码快照，使用 ESP-IDF v5.5.5，提供 Brookesia 桌面、ESP-Hosted Wi-Fi、
+摄像头、音频、多媒体、设置和小智等应用。本地板级组件保持 ST7701 屏每条数据
+lane 500 Mbps 的速率和 30 MHz DPI 时钟，并保留该镜像的 GT911 配置：依次探测
+`0x5D`、`0x14` 后轮询，RST 使用 GPIO23，不使用 INT。产品示例使用更新的 Registry
+BSP，不驱动 GT911 的 INT 或 RST。
 
-请按照官方产品文档使用正确的烧录工具、偏移地址和恢复流程。该出厂镜像的源码和
-构建说明尚未包含在本仓库中，后续更新可能会补充相关内容。
+对应的 16 MiB 合并镜像为
+[`ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260820.bin`](firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260820.bin)，
+从偏移 `0x0` 开始烧录。此前的
+[`ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin`](firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin)
+继续作为不可变恢复镜像保留。两份镜像都不是示例构建工作流生成的产物，也不作为
+ESP-IDF 示例固件处理。
+
+请按照官方产品文档使用正确的烧录工具和恢复流程。复现 Rev3.x 源码请参阅
+[默认固件构建说明](firmware/brookesia/README_ZH.md)。编译通过不能替代实际硬件验证。
 
 ## 🧪 ESP-IDF 示例
 
@@ -120,7 +130,7 @@ Arduino 示例使用 Arduino-ESP32 `3.3.11` 与 `ChipVariant=postv3`。该核心
 | --- | --- |
 | [`examples/esp-idf/`](examples/esp-idf/) | 第一方 ESP-IDF 工程 |
 | [`examples/arduino/`](examples/arduino/) | 第一方 Arduino 示例及本板显示适配层 |
-| [`firmware/`](firmware/) | 仓库内提供的出厂及恢复镜像 |
+| [`firmware/`](firmware/) | 对应日期版本的出厂固件源码及不可变恢复镜像 |
 | [`schematic/`](schematic/) | 产品原理图 |
 | [`assets/`](assets/) | 文档使用的产品图片 |
 | [`config/ci/`](config/ci/) | 仅供 Actions 使用的条件 sdkconfig 覆盖配置 |

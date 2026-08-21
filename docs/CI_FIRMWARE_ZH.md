@@ -7,11 +7,15 @@
 `flasher_args.json`，绝不替代 [`firmware/`](../firmware/) 中不可变的出厂镜像。产物保留七天
 后过期。
 
-仓库审计将该出厂镜像锁定为
-`ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin`、33,488,896 字节，SHA-256 为
-`f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022`。
+仓库审计锁定以下两份镜像：
+
+| 镜像 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin` | 33,488,896 字节 | `f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022` |
+| `ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260820.bin` | 16,777,216 字节 | `60f1ea3c77d75c95bd1de75b12642fe11c53873e0290a9b96bb6bb7a4c3aad78` |
+
 路径、大小或摘要任一变化都必须经过明确的发布审核并同步更新审计策略；示例 CI 不会
-重新生成该文件。
+重新生成这些文件。
 
 ## 来源和认证
 
