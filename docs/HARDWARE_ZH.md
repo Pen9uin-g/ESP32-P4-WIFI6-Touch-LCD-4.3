@@ -4,8 +4,8 @@
 
 本审计对比仓库内的[产品原理图](../schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf)、
 产品配置及[上游 PR #191](https://github.com/waveshareteam/Waveshare-ESP32-components/pull/191)
-中的已审核 BSP 更新。该 BSP 在 ESP Component Registry 发布前，产品 manifest 仍需保留
-临时审核源码锁定。本审计属于仓库审查，不能替代对实际硬件版本的核对。
+中的已审核 BSP 更新。该更新已作为 Registry 版本 `1.0.1` 发布，全部产品 manifest 均选用
+该精确在线版本且不包含 Git/path 覆盖。本审计属于仓库审查，不能替代对实际硬件版本的核对。
 
 ## 已确认的产品接口
 

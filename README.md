@@ -56,12 +56,13 @@ also use the schematic and the board revision in hand.
 The default ESP-IDF profile is `rev3_x`: it requires `CONFIG_ESP32P4_REV_MIN_300`
 and uses 250 MHz PSRAM. Rev1.3 boards remain supported through the explicit
 `config/ci/rev1_3.defaults` compatibility overlay, which selects
-`CONFIG_ESP32P4_REV_MIN_100` and 200 MHz PSRAM. The pending PR #191 BSP update
+`CONFIG_ESP32P4_REV_MIN_100` and 200 MHz PSRAM. The BSP released from
+[PR #191](https://github.com/waveshareteam/Waveshare-ESP32-components/pull/191)
 leaves MIPI PHY clock selection to ESP-IDF's revision-aware default; do not copy
-a clock-source setting between profiles. Examples 06–12 still retain the old
-temporary Git source pin and are not Rev3.x runtime-ready until the fixed BSP is
-published and selected from the Registry. A successful compile does not
-validate panel timing on a physical board.
+a clock-source setting between profiles. Examples 06–12 select the published
+Registry release `waveshare/esp32_p4_wifi6_touch_lcd_4_3==1.0.1`, which includes
+the Rev3.x clock update and no-INT/RST GT911 address probing. A successful
+compile does not validate panel timing on a physical board.
 
 Arduino-ESP32 `3.3.11` is a separate prebuilt-core profile: its
 `ChipVariant=postv3` libraries resolve to `CONFIG_ESP32P4_REV_MIN_301` and

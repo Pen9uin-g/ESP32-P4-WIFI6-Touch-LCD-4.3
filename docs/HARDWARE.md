@@ -6,9 +6,9 @@ This audit compares the checked-in
 [schematic](../schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf), the product
 configuration, and the reviewed BSP update in
 [upstream PR #191](https://github.com/waveshareteam/Waveshare-ESP32-components/pull/191).
-The product manifests must remain on their temporary reviewed source pin until
-that BSP is published in the ESP Component Registry. This is a repository
-review, not a substitute for checking the physical board revision.
+That update is published as Registry release `1.0.1`, and all product manifests
+select that exact online version without Git/path overrides. This is a
+repository review, not a substitute for checking the physical board revision.
 
 ## Confirmed product interfaces
 

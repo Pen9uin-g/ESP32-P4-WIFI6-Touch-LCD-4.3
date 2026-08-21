@@ -52,10 +52,12 @@ CI 仅证明源码编译兼容性；硬件引脚和时序还应结合原理图�
 
 ESP-IDF 默认配置使用 `rev3_x`：要求 `CONFIG_ESP32P4_REV_MIN_300`，并使用
 250 MHz PSRAM。Rev1.3 仍通过显式的 `config/ci/rev1_3.defaults` 兼容覆盖层支持，
-该覆盖层选择 `CONFIG_ESP32P4_REV_MIN_100` 和 200 MHz PSRAM。待合并的 PR #191 BSP 更新会将
-MIPI PHY 时钟选择交由 ESP-IDF 的芯片版本感知默认值处理；不要在不同配置之间复制时钟源设置。
-示例 06–12 仍保留旧的临时 Git 源码锁定，在修复版 BSP 发布并从 Registry 选用前，不能视为
-Rev3.x 实板运行就绪。编译通过不能代替实板屏幕时序验证。
+该覆盖层选择 `CONFIG_ESP32P4_REV_MIN_100` 和 200 MHz PSRAM。由
+[PR #191](https://github.com/waveshareteam/Waveshare-ESP32-components/pull/191)
+发布的 BSP 会将 MIPI PHY 时钟选择交由 ESP-IDF 的芯片版本感知默认值处理；不要在不同配置之间
+复制时钟源设置。示例 06–12 选用已发布的 Registry 版本
+`waveshare/esp32_p4_wifi6_touch_lcd_4_3==1.0.1`，其中包含 Rev3.x 时钟更新及不使用 INT/RST
+的 GT911 地址探测。编译通过不能代替实板屏幕时序验证。
 
 Arduino-ESP32 `3.3.11` 使用独立的预编译核心配置：`ChipVariant=postv3` 对应的库实际为
 `CONFIG_ESP32P4_REV_MIN_301` 和 200 MHz PSRAM。因此 Arduino 示例要求 P4 Rev3.1 或更新版本，

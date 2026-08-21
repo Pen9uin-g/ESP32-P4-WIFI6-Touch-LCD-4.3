@@ -33,9 +33,10 @@
 `config/ci/rev3_x.defaults` 作为显式的 CI 断言。`config/ci/rev1_3.defaults` 覆盖层可用于
 Rev1.3：在示例目录中执行
 `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;../../../config/ci/rev1_3.defaults" build`。
-它选择旧版 P4 芯片和 200 MHz PSRAM。待合并的 PR #191 BSP 更新会让 ESP-IDF 为每个配置
-选择匹配的 MIPI PHY 参考时钟。manifest 中的旧临时 Git 锁定不含 Rev3.x 修复，必须在产品
-CI 可作为最终运行兼容证据前切换到已发布 Registry 版本。
+它选择旧版 P4 芯片和 200 MHz PSRAM。由 PR #191 发布的 BSP Registry 版本 `1.0.1` 会让
+ESP-IDF 为每个配置选择匹配的 MIPI PHY 参考时钟。7 个 BSP manifest 均使用精确在线版本
+`==1.0.1`，因此完整源码影响运行会验证当前托管依赖。这些构建仍只属于编译证据，不能代替
+实板屏幕时序或触摸验证。
 
 - 示例 06 在两个 ESP-IDF 版本下各有 1 个 ES7210 至 ES8311 回声任务，共 2 个；
 - 示例 07 至 12 在两个 ESP-IDF 版本下的 12 个 RGB888 任务；

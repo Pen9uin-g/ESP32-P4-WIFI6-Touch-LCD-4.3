@@ -103,9 +103,7 @@ REQUIRED_HOMEPAGE_BADGES = {"build", "license"}
 REQUIRED_HOMEPAGE_H2_ICONS = ["✨", "🖥️", "📦", "🧪", "🛠️", "🗂️", "📚", "🤝", "📄"]
 BSP_COMPONENT = "waveshare/esp32_p4_wifi6_touch_lcd_4_3"
 BSP_PIN_FIELDS = {
-    "git": "https://github.com/waveshareteam/Waveshare-ESP32-components.git",
-    "path": "bsp/esp32_p4_wifi6_touch_lcd_4_3",
-    "version": "ac94f5da7c0e44963828ab970337e89d23e04330",
+    "version": "==1.0.1",
 }
 BSP_BASE_COMPONENT_DIRS = (
     "examples/esp-idf/06_I2SCodec/components/esp32_p4_wifi6_touch_lcd_4_3",
@@ -187,7 +185,7 @@ def factory_firmware_integrity_errors(
 
 
 def pinned_bsp_dependency_errors(manifest: str) -> list[str]:
-    """Validate the dependency-manager subset used by the reviewed BSP source pin."""
+    """Require the exact published BSP release without source overrides."""
     key_pattern = re.compile(rf"(?m)^  {re.escape(BSP_COMPONENT)}:[ \t]*$")
     matches = list(key_pattern.finditer(manifest))
     if len(matches) != 1:
@@ -211,7 +209,9 @@ def pinned_bsp_dependency_errors(manifest: str) -> list[str]:
         fields[field] = value.strip().strip("\"'")
 
     if fields != BSP_PIN_FIELDS:
-        errors.append("BSP dependency must use the exact reviewed git, path, and version pin")
+        errors.append(
+            "BSP dependency must use the exact published Registry version without git/path fields"
+        )
     return errors
 
 

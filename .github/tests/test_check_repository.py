@@ -90,20 +90,25 @@ class RepositoryCheckTests(unittest.TestCase):
             errors = checks.factory_firmware_integrity_errors(root, **kwargs)
             self.assertTrue(any("sole immutable factory firmware" in error for error in errors))
 
-    def test_reviewed_bsp_pin_requires_exact_mapping(self) -> None:
+    def test_published_bsp_pin_requires_exact_registry_mapping(self) -> None:
         manifest = (
             "dependencies:\n"
             f"  {checks.BSP_COMPONENT}:\n"
-            f"    git: {checks.BSP_PIN_FIELDS['git']}\n"
-            f"    path: {checks.BSP_PIN_FIELDS['path']}\n"
-            f"    version: {checks.BSP_PIN_FIELDS['version']}\n"
+            f"    version: \"{checks.BSP_PIN_FIELDS['version']}\"\n"
         )
         self.assertEqual(checks.pinned_bsp_dependency_errors(manifest), [])
         self.assertTrue(
             checks.pinned_bsp_dependency_errors(
-                manifest.replace(checks.BSP_PIN_FIELDS["version"], "deadbeef")
+                manifest.replace(checks.BSP_PIN_FIELDS["version"], "^1.0.1")
             )
         )
+        source_override = manifest.replace(
+            "    version:",
+            "    git: https://github.com/waveshareteam/Waveshare-ESP32-components.git\n"
+            "    path: bsp/esp32_p4_wifi6_touch_lcd_4_3\n"
+            "    version:",
+        )
+        self.assertTrue(checks.pinned_bsp_dependency_errors(source_override))
         self.assertTrue(
             checks.pinned_bsp_dependency_errors(
                 manifest.replace(f"  {checks.BSP_COMPONENT}:\n", f"  {checks.BSP_COMPONENT}: \"*\"\n")
@@ -114,9 +119,7 @@ class RepositoryCheckTests(unittest.TestCase):
         manifest = (
             "dependencies:\n"
             f"  {checks.BSP_COMPONENT}:\n"
-            f"    git: {checks.BSP_PIN_FIELDS['git']}\n"
-            f"    path: {checks.BSP_PIN_FIELDS['path']}\n"
-            f"    version: {checks.BSP_PIN_FIELDS['version']}\n"
+            f"    version: \"{checks.BSP_PIN_FIELDS['version']}\"\n"
         )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

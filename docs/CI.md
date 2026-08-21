@@ -36,11 +36,12 @@ also appends `config/ci/rev3_x.defaults` as an explicit CI assertion. The
 explicit `config/ci/rev1_3.defaults` overlay remains runnable for Rev1.3:
 from an example directory run
 `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;../../../config/ci/rev1_3.defaults" build`.
-It selects the older P4 revision and 200 MHz PSRAM. The pending PR #191 BSP
-update lets ESP-IDF choose the matching MIPI PHY reference clock for each
-profile. The manifests' old temporary Git pin does not contain that Rev3.x fix,
-so it must be replaced by the published Registry release before product CI can
-be treated as final runtime-compatible evidence.
+It selects the older P4 revision and 200 MHz PSRAM. BSP Registry release `1.0.1`,
+published from PR #191, lets ESP-IDF choose the matching MIPI PHY reference
+clock for each profile. All seven BSP manifests use the exact online version
+`==1.0.1`; a full source-impact run therefore validates the current managed
+dependency. These builds remain compile evidence rather than physical-board
+timing or touch validation.
 
 - 2 ES7210-to-ES8311 echo jobs for example 06, one on each ESP-IDF version;
 - 12 RGB888 jobs for examples 07 through 12 on both ESP-IDF versions;
