@@ -65,30 +65,52 @@ class RepositoryCheckTests(unittest.TestCase):
             )
 
     def test_factory_firmware_identity_locks_path_size_and_sha256(self) -> None:
-        payload = b"synthetic immutable factory image"
-        digest = hashlib.sha256(payload).hexdigest()
-        expected = "firmware/product-FactoryOnly.bin"
+        payloads = {
+            "firmware/product-old-FactoryOnly.bin": b"synthetic old immutable factory image",
+            "firmware/product-new-FactoryOnly.bin": b"synthetic new immutable factory image",
+        }
+        expected_images = {
+            path: (len(payload), hashlib.sha256(payload).hexdigest())
+            for path, payload in payloads.items()
+        }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            image = root / expected
-            image.parent.mkdir(parents=True)
-            image.write_bytes(payload)
-            kwargs = {
-                "expected_path": expected,
-                "expected_size": len(payload),
-                "expected_sha256": digest,
-            }
+            for path, payload in payloads.items():
+                image = root / path
+                image.parent.mkdir(parents=True, exist_ok=True)
+                image.write_bytes(payload)
+            generated = root / "firmware/brookesia/build-local/generated.bin"
+            generated.parent.mkdir(parents=True)
+            generated.write_bytes(b"ignored build output")
+            managed = root / "firmware/brookesia/managed_components/vendor/asset.bin"
+            managed.parent.mkdir(parents=True)
+            managed.write_bytes(b"ignored managed-component asset")
+            kwargs = {"expected_images": expected_images}
             self.assertEqual(checks.factory_firmware_integrity_errors(root, **kwargs), [])
 
-            image.write_bytes(payload + b"changed")
-            errors = checks.factory_firmware_integrity_errors(root, **kwargs)
-            self.assertTrue(any("immutable size changed" in error for error in errors))
-            self.assertTrue(any("immutable SHA-256 changed" in error for error in errors))
+            for path, payload in payloads.items():
+                with self.subTest(changed=path):
+                    image = root / path
+                    image.write_bytes(payload + b"changed")
+                    errors = checks.factory_firmware_integrity_errors(root, **kwargs)
+                    self.assertTrue(any("immutable size changed" in error for error in errors))
+                    self.assertTrue(any("immutable SHA-256 changed" in error for error in errors))
+                    image.write_bytes(payload)
 
-            image.write_bytes(payload)
+                with self.subTest(missing=path):
+                    image.unlink()
+                    errors = checks.factory_firmware_integrity_errors(root, **kwargs)
+                    self.assertTrue(
+                        any("expected immutable factory firmware binaries" in error for error in errors)
+                    )
+                    image.write_bytes(payload)
+
+            image = root / "firmware/product-new-FactoryOnly.bin"
             (image.parent / "unexpected.bin").write_bytes(b"extra")
             errors = checks.factory_firmware_integrity_errors(root, **kwargs)
-            self.assertTrue(any("sole immutable factory firmware" in error for error in errors))
+            self.assertTrue(
+                any("expected immutable factory firmware binaries" in error for error in errors)
+            )
 
     def test_published_bsp_pin_requires_exact_registry_mapping(self) -> None:
         manifest = (

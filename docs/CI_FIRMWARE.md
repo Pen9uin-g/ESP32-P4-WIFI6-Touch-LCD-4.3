@@ -5,14 +5,18 @@
 A complete ESP-IDF matrix run, such as a manual `all` run or a global build-input
 change, creates 42 temporary flashable diagnostic packages. A path-routed run
 creates packages only for its selected lanes. Every package comes from that
-lane's `flasher_args.json`; none replaces the immutable factory image under
+lane's `flasher_args.json`; none replaces the immutable factory images under
 [`firmware/`](../firmware/). Artifacts expire after seven days.
 
-The repository audit locks that factory image to
-`ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin`, 33,488,896 bytes, with
-SHA-256 `f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022`.
-Changing any of those three identity fields requires an explicit release review
-and a matching audit-policy update; example CI never regenerates the file.
+The repository audit locks both checked-in images:
+
+| Image | Size | SHA-256 |
+| --- | ---: | --- |
+| `ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin` | 33,488,896 bytes | `f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022` |
+| `ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260820.bin` | 16,777,216 bytes | `60f1ea3c77d75c95bd1de75b12642fe11c53873e0290a9b96bb6bb7a4c3aad78` |
+
+Changing any path, size, or digest requires an explicit release review and a
+matching audit-policy update; example CI never regenerates these files.
 
 ## Provenance and authentication
 
@@ -74,4 +78,5 @@ returns zero and reports `Hash of data verified`.
 That proves the programmed bytes, not display, touch, audio, networking, or
 other hardware-in-the-loop behavior. Test those functions manually. Do not use
 this flow to flash, replace, infer offsets for, or validate checked-in
-factory/recovery firmware; it has separate release and recovery ownership.
+factory/recovery firmware; those images have separate release and recovery
+ownership.

@@ -51,6 +51,10 @@
       "chinese": "docs/HARDWARE_ZH.md"
     },
     {
+      "english": "firmware/brookesia/README.md",
+      "chinese": "firmware/brookesia/README_ZH.md"
+    },
+    {
       "english": "examples/esp-idf/09_video_lcd_display/README.md",
       "chinese": "examples/esp-idf/09_video_lcd_display/README_ZH.md"
     },

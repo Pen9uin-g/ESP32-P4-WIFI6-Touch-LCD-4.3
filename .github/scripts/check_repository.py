@@ -25,6 +25,7 @@ REQUIRED_PAIRS = (
     ("docs/CI_FIRMWARE.md", "docs/CI_FIRMWARE_ZH.md"),
     ("docs/COMPONENTS.md", "docs/COMPONENTS_ZH.md"),
     ("docs/HARDWARE.md", "docs/HARDWARE_ZH.md"),
+    ("firmware/brookesia/README.md", "firmware/brookesia/README_ZH.md"),
     ("examples/arduino/README.md", "examples/arduino/README_ZH.md"),
     (
         "examples/esp-idf/09_video_lcd_display/README.md",
@@ -129,9 +130,16 @@ BSP_MANIFESTS = (
     "examples/esp-idf/11_esp_brookesia_phone/main/idf_component.yml",
     "examples/esp-idf/12_usb_extend_screen/components/bsp_extra/idf_component.yml",
 )
-FACTORY_FIRMWARE_PATH = "firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin"
-FACTORY_FIRMWARE_SIZE = 33_488_896
-FACTORY_FIRMWARE_SHA256 = "f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022"
+FACTORY_FIRMWARE_IMAGES = {
+    "firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260206.bin": (
+        33_488_896,
+        "f87b4b16f49704dc8b05b44953a45c011ca9c244e05547e035b4bfa3db74e022",
+    ),
+    "firmware/ESP32-P4-WIFI6-Touch-LCD-4.3-FactoryOnly-260820.bin": (
+        16_777_216,
+        "60f1ea3c77d75c95bd1de75b12642fe11c53873e0290a9b96bb6bb7a4c3aad78",
+    ),
+}
 
 
 def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
@@ -148,39 +156,46 @@ def direct_examples(repo_root: Path = REPO_ROOT) -> list[Path]:
 def factory_firmware_integrity_errors(
     repo_root: Path,
     *,
-    expected_path: str = FACTORY_FIRMWARE_PATH,
-    expected_size: int = FACTORY_FIRMWARE_SIZE,
-    expected_sha256: str = FACTORY_FIRMWARE_SHA256,
+    expected_images: dict[str, tuple[int, str]] | None = None,
 ) -> list[str]:
-    """Require the reviewed factory image identity without modifying the artifact."""
+    """Require every reviewed factory image identity without modifying artifacts."""
+    if expected_images is None:
+        expected_images = FACTORY_FIRMWARE_IMAGES
     firmware_root = repo_root / "firmware"
     binaries = sorted(
         path.relative_to(repo_root).as_posix()
         for path in firmware_root.rglob("*")
-        if path.is_file() and path.suffix.lower() == ".bin"
+        if path.is_file()
+        and path.suffix.lower() == ".bin"
+        and not any(
+            part in EXCLUDED_DIRECTORY_NAMES or part.startswith("build-")
+            for part in path.relative_to(firmware_root).parts[:-1]
+        )
     ) if firmware_root.is_dir() else []
     errors: list[str] = []
-    if binaries != [expected_path]:
+    expected_paths = sorted(expected_images)
+    if binaries != expected_paths:
         errors.append(
-            f"expected the sole immutable factory firmware binary at {expected_path}; "
+            f"expected immutable factory firmware binaries at {', '.join(expected_paths)}; "
             f"found {', '.join(binaries) if binaries else 'none'}"
         )
 
-    image = repo_root / expected_path
-    if not image.is_file():
-        return errors
-    size = image.stat().st_size
-    if size != expected_size:
-        errors.append(
-            f"{expected_path}: immutable size changed (expected {expected_size}, found {size})"
-        )
-    hasher = hashlib.sha256()
-    with image.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            hasher.update(chunk)
-    digest = hasher.hexdigest()
-    if digest != expected_sha256:
-        errors.append(f"{expected_path}: immutable SHA-256 changed")
+    for expected_path, (expected_size, expected_sha256) in expected_images.items():
+        image = repo_root / expected_path
+        if not image.is_file():
+            continue
+        size = image.stat().st_size
+        if size != expected_size:
+            errors.append(
+                f"{expected_path}: immutable size changed (expected {expected_size}, found {size})"
+            )
+        hasher = hashlib.sha256()
+        with image.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                hasher.update(chunk)
+        digest = hasher.hexdigest()
+        if digest != expected_sha256:
+            errors.append(f"{expected_path}: immutable SHA-256 changed")
     return errors
 
 
