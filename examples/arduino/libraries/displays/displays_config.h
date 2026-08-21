@@ -5,8 +5,8 @@
  * ESP32-P4-WIFI6-Touch-LCD-4.3 Arduino display configuration.
  *
  * The panel command table and timings are copied from the board BSP's ST7701
- * MIPI implementation. The small WaveshareDsiDisplay adapter is independent
- * of Arduino_GFX internals and therefore does not vendor Arduino_GFX itself.
+ * MIPI implementation. WaveshareDsiDisplay is kept separate from Arduino_GFX
+ * internals, while the complete reviewed Arduino_GFX source remains bundled.
  */
 #pragma once
 

@@ -107,3 +107,8 @@ compile jobs; an unclassified Arduino path conservatively selects all ten.
 Manual dispatch can select one sketch or all ten. Arduino-only source paths do
 not select the ESP-IDF matrix. The repository makes no CAN or RS485 hardware
 claim.
+
+The workflow installs only the pinned Arduino-ESP32 core. Arduino_GFX `1.6.0`,
+LVGL `9.3.0`, the full LVGL configuration, and the board display/touch adapter
+are retained under `examples/arduino/libraries/` and are passed to every compile
+with `--libraries`; CI does not replace them with Library Manager downloads.

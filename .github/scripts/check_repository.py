@@ -58,6 +58,35 @@ REQUIRED_CI_HELPERS = (
     ".github/tests/test_discover_esp_idf_examples.py",
     ".github/tests/test_discover_arduino_examples.py",
 )
+ARDUINO_LIBRARY_REQUIREMENTS = {
+    "GFX_Library_for_Arduino": {
+        "version": "1.6.0",
+        "files": (
+            "README.md",
+            "license.txt",
+            "src/Arduino_GFX_Library.h",
+            "src/databus/Arduino_ESP32DSIPanel.cpp",
+        ),
+    },
+    "lvgl": {
+        "version": "9.3.0",
+        "files": (
+            "COPYRIGHTS.md",
+            "LICENCE.txt",
+            "README.md",
+            "src/core/lv_obj.c",
+            "src/demos/benchmark/screenshot1.png",
+            "src/demos/keypad_encoder/screenshot1.png",
+            "src/demos/music/screenshot1.gif",
+            "src/demos/stress/screenshot1.png",
+        ),
+    },
+}
+ARDUINO_LV_CONF_MARKERS = (
+    "#define LV_COLOR_DEPTH 16",
+    "#define LV_USE_OS   LV_OS_NONE",
+    "#define LV_USE_DEMO_WIDGETS 1",
+)
 REQUIRED_HOMEPAGE_COMPONENTS = {
     "centered_header",
     "html_h1",
@@ -533,6 +562,43 @@ def required_ci_helper_errors(repo_root: Path) -> list[str]:
     ]
 
 
+def bundled_arduino_library_errors(repo_root: Path) -> list[str]:
+    """Keep the reviewed Arduino libraries complete and version-identifiable."""
+    errors: list[str] = []
+    root = repo_root / "examples" / "arduino" / "libraries"
+    for name, requirement in ARDUINO_LIBRARY_REQUIREMENTS.items():
+        library = root / name
+        properties = library / "library.properties"
+        try:
+            metadata = properties.read_text(encoding="utf-8")
+        except OSError as error:
+            errors.append(f"{properties.relative_to(repo_root)}: cannot read bundled library metadata: {error}")
+            continue
+        version = re.search(r"(?m)^version=([^\r\n]+)$", metadata)
+        expected_version = requirement["version"]
+        if version is None or version.group(1) != expected_version:
+            found = version.group(1) if version else "missing"
+            errors.append(
+                f"{properties.relative_to(repo_root)}: expected bundled version "
+                f"{expected_version}, found {found}"
+            )
+        for relative in requirement["files"]:
+            required = library / relative
+            if not required.is_file():
+                errors.append(f"{required.relative_to(repo_root)}: missing bundled library file")
+
+    lv_conf = root / "lv_conf.h"
+    try:
+        configuration = lv_conf.read_text(encoding="utf-8")
+    except OSError as error:
+        errors.append(f"{lv_conf.relative_to(repo_root)}: cannot read bundled LVGL configuration: {error}")
+    else:
+        for marker in ARDUINO_LV_CONF_MARKERS:
+            if marker not in configuration:
+                errors.append(f"{lv_conf.relative_to(repo_root)}: missing full configuration marker {marker}")
+    return errors
+
+
 def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     errors: list[str] = []
     examples = direct_examples(repo_root)
@@ -550,6 +616,8 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
             errors.append(f"missing CI sdkconfig overlay: {relative}")
 
     errors.extend(required_ci_helper_errors(repo_root))
+
+    errors.extend(bundled_arduino_library_errors(repo_root))
 
     errors.extend(bsp_pin_policy_errors(repo_root))
 

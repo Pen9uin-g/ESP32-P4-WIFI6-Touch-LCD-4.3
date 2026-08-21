@@ -8,18 +8,21 @@ QIO at 80 MHz, and the 13 MB application / 7 MB data partition layout. That
 prebuilt core uses 200 MHz PSRAM; it is not the ESP-IDF Rev3.x 250 MHz profile
 and does not support Rev3.0.
 
-Install these exact Library Manager dependencies before compiling:
+The repository keeps the complete Arduino library bundles used by the examples,
+including their upstream licenses, documentation, and source trees:
 
-- `GFX Library for Arduino` `1.6.7`
-- `lvgl` `9.3.0` for example 04
+- `GFX Library for Arduino` `1.6.0`
+- `lvgl` `9.3.0` plus the full `lv_conf.h` configuration for example 04
 
-For example 04, copy `libraries/lv_conf.h` next to the Library Manager `lvgl`
-folder (normally to `Arduino/libraries/lv_conf.h`). The Actions workflow does
-this explicitly so the demo configuration is reproducible.
+Do not replace these with a Library Manager download when reproducing the
+reviewed build. The Actions workflow compiles directly against the checked-in
+copies so local and CI builds use the same sources.
 
-The sketches also require this repository's `libraries/displays` adapter. With
-Arduino IDE, copy that directory to the sketchbook `libraries/displays`
-directory. With Arduino CLI from the repository root, pass it explicitly:
+The sketches also require this repository's board-specific `libraries/displays`
+adapter. With Arduino IDE, copy `GFX_Library_for_Arduino`, `lvgl`, `lv_conf.h`,
+and `displays` from `examples/arduino/libraries/` into the sketchbook
+`libraries/` directory without trimming their contents. With Arduino CLI from
+the repository root, pass the complete directory explicitly:
 
 ```console
 arduino-cli compile --fqbn <esp32p4-fqbn> \
@@ -27,7 +30,7 @@ arduino-cli compile --fqbn <esp32p4-fqbn> \
   examples/arduino/examples/01_HelloWorld
 ```
 
-The local `libraries/displays` adapter contains only this board's 480 × 800
+The board-specific `libraries/displays` adapter contains this board's 480 × 800
 ST7701 configuration. It uses a 30 MHz DPI clock, two 500 Mbps MIPI-DSI lanes,
 and ESP-IDF's revision-aware default MIPI PHY clock source. GT911 is polled
 without assigning INT or RST: initialization probes `0x5D`, then `0x14`, and

@@ -86,3 +86,7 @@ PR 头 SHA（或 push SHA），包含校验和及由清单导出的偏移，且�
 仅 ESP-IDF 变更仍运行预检，但不会创建 Arduino 编译任务；无法分类的 Arduino 路径会保守选择
 全部 10 项。手动触发可选择单个示例或全部示例。仅 Arduino 源码路径的变更不会选择 ESP-IDF
 矩阵。本仓库不声明 CAN 或 485 板载功能。
+
+该工作流只在线安装锁定的 Arduino-ESP32 core。Arduino_GFX `1.6.0`、LVGL `9.3.0`、
+完整 LVGL 配置以及本板显示/触摸适配层均保留在 `examples/arduino/libraries/`，每次编译
+都通过 `--libraries` 使用这些仓库内源码；CI 不会再用 Library Manager 下载内容替换它们。

@@ -17,6 +17,37 @@ SPEC.loader.exec_module(checks)
 
 
 class RepositoryCheckTests(unittest.TestCase):
+    def test_bundled_arduino_libraries_keep_versions_sources_and_licenses(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            libraries = root / "examples/arduino/libraries"
+            for name, requirement in checks.ARDUINO_LIBRARY_REQUIREMENTS.items():
+                library = libraries / name
+                library.mkdir(parents=True)
+                (library / "library.properties").write_text(
+                    f"name={name}\nversion={requirement['version']}\n",
+                    encoding="utf-8",
+                )
+                for relative in requirement["files"]:
+                    path = library / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.touch()
+            (libraries / "lv_conf.h").write_text(
+                "\n".join(checks.ARDUINO_LV_CONF_MARKERS) + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(checks.bundled_arduino_library_errors(root), [])
+
+            missing = libraries / "lvgl/src/core/lv_obj.c"
+            missing.unlink()
+            errors = checks.bundled_arduino_library_errors(root)
+            self.assertTrue(any("missing bundled library file" in error for error in errors))
+
+            properties = libraries / "GFX_Library_for_Arduino/library.properties"
+            properties.write_text("version=9.9.9\n", encoding="utf-8")
+            errors = checks.bundled_arduino_library_errors(root)
+            self.assertTrue(any("expected bundled version 1.6.0" in error for error in errors))
+
     def test_required_ci_helpers_fail_closed_when_workflow_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
