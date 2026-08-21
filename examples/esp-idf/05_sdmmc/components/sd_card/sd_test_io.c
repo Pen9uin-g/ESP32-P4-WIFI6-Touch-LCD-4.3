@@ -5,6 +5,7 @@
  */
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include "esp_adc/adc_oneshot.h"
 #include "driver/gpio.h"
@@ -105,6 +106,11 @@ static uint32_t get_cycles_until_pin_level(int i, int level, int timeout) {
 
 void check_sd_card_pins(pin_configuration_t *config, const int pin_count)
 {
+    if (config == NULL || pin_count <= 0) {
+        ESP_LOGE(TAG, "Invalid SD pin configuration");
+        return;
+    }
+
     ESP_LOGI(TAG, "Testing SD pin connections and pullup strength");
     gpio_config_t io_conf = {};
     for (int i = 0; i < pin_count; ++i) {
@@ -148,11 +154,19 @@ void check_sd_card_pins(pin_configuration_t *config, const int pin_count)
     };
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
 
-    adc_cali_handle_t *adc_cali_handle = (adc_cali_handle_t *)malloc(sizeof(adc_cali_handle_t)*pin_count);
-    bool *do_calibration = (bool *)malloc(sizeof(bool)*pin_count);
+    adc_cali_handle_t *adc_cali_handle = calloc((size_t)pin_count, sizeof(*adc_cali_handle));
+    bool *do_calibration = calloc((size_t)pin_count, sizeof(*do_calibration));
+    if (adc_cali_handle == NULL || do_calibration == NULL) {
+        ESP_LOGE(TAG, "Not enough memory for ADC calibration state");
+        free(adc_cali_handle);
+        free(do_calibration);
+        ESP_ERROR_CHECK(adc_oneshot_del_unit(adc_handle));
+        return;
+    }
 
     for (int i = 0; i < pin_count; i++) {
-        do_calibration[i] = adc_calibration_init(CONFIG_EXAMPLE_ADC_UNIT, i, ADC_ATTEN_DB, &adc_cali_handle[i]);
+        do_calibration[i] = adc_calibration_init(CONFIG_EXAMPLE_ADC_UNIT, config->adc_channels[i],
+                                                 ADC_ATTEN_DB, &adc_cali_handle[i]);
     }
 
     printf("\n**** PIN voltage levels ****\n\n");
@@ -189,7 +203,7 @@ void check_sd_card_pins(pin_configuration_t *config, const int pin_count)
                 continue;
             }
             usleep(100);
-            float voltage = get_pin_voltage(config->adc_channels[j], adc_handle, do_calibration[i], adc_cali_handle[i]);
+            float voltage = get_pin_voltage(config->adc_channels[j], adc_handle, do_calibration[j], adc_cali_handle[j]);
             printf("%1.1fV  ", voltage);
         }
         printf("\n");
@@ -214,7 +228,7 @@ void check_sd_card_pins(pin_configuration_t *config, const int pin_count)
             }
             gpio_pullup_en(config->pins[j]);
             usleep(100);
-            float voltage = get_pin_voltage(config->adc_channels[j], adc_handle, do_calibration[i], adc_cali_handle[i]);
+            float voltage = get_pin_voltage(config->adc_channels[j], adc_handle, do_calibration[j], adc_cali_handle[j]);
             printf("%1.1fV  ", voltage);
             gpio_pullup_dis(config->pins[j]);
         }
@@ -227,5 +241,8 @@ void check_sd_card_pins(pin_configuration_t *config, const int pin_count)
             example_adc_calibration_deinit(adc_cali_handle[i]);
         }
     }
+    free(adc_cali_handle);
+    free(do_calibration);
+    ESP_ERROR_CHECK(adc_oneshot_del_unit(adc_handle));
 #endif //CONFIG_EXAMPLE_ENABLE_ADC_FEATURE
 }

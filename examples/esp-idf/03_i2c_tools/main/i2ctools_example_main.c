@@ -74,6 +74,7 @@ void app_main(void)
     };
 
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &tool_bus_handle));
+    i2ctools_set_bus_config(&i2c_bus_config);
 
     register_i2ctools();
 

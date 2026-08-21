@@ -1,4 +1,4 @@
-menu "HDMI MP4 Player Configuration"
+menu "MP4/AVI Player Configuration"
 
     menu "Video File Configuration"
         config MP4_FILENAME
@@ -6,22 +6,6 @@ menu "HDMI MP4 Player Configuration"
             default "test_video.mp4"
             help
                 Name of the video file to be played.
-    endmenu
-
-    menu "Display Configuration"
-
-        config USE_LCD_BUFFER
-            bool "Use LCD Internal Buffer"
-            default y
-            help
-                Use the internal LCD buffer for frame rendering.
-                When enabled, uses the DPI panel's built-in frame buffer for efficient rendering.
-                When disabled, allocates separate frame buffers in external memory.
-
-                Important notes when using LCD internal buffer:
-                1. MP4 video resolution must match the HDMI output resolution
-                2. This mode provides the highest possible frame rate
-
     endmenu
 
     menu "Audio Decoder Configuration"

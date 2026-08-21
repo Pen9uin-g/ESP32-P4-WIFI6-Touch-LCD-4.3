@@ -153,7 +153,7 @@ static void setup_periph_new_record_codec()
         in_ctrl_if = audio_codec_new_i2c_ctrl(&i2c_ctrl_cfg);
         es7210_codec_cfg_t es7210_cfg = {
             .ctrl_if = in_ctrl_if,
-            .mic_selected = ES7120_SEL_MIC1 | ES7120_SEL_MIC2 | ES7120_SEL_MIC3,
+            .mic_selected = ES7210_SEL_MIC1 | ES7210_SEL_MIC2 | ES7210_SEL_MIC3,
         };
         in_codec_if = es7210_codec_new(&es7210_cfg);
     }

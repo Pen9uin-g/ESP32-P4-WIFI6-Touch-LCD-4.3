@@ -129,7 +129,7 @@ endif()
 idf_component_register(
     SRCS ${SRCS_C} ${SRCS_CPP}
     INCLUDE_DIRS ${INCLUDE_DIRS}
-    REQUIRES json esp_netif esp_wifi nvs_flash
+    REQUIRES esp_netif esp_wifi nvs_flash esp_driver_i2c esp_driver_i2s
 )
 include(package_manager)
 cu_pkg_define_version(${CMAKE_CURRENT_LIST_DIR})
@@ -171,6 +171,9 @@ target_compile_options(${COMPONENT_LIB}
 )
 set(SRCS_C_COMPILE_FLAGS "-Wno-format")
 set(SRCS_CPP_COMPILE_FLAGS "-Wno-missing-field-initializers -Wno-format")
+if(CONFIG_ESP_BROOKESIA_ENABLE_AI_FRAMEWORK)
+    string(APPEND SRCS_CPP_COMPILE_FLAGS " -fpermissive")
+endif()
 set_source_files_properties(
     ${SRCS_CPP}
     PROPERTIES

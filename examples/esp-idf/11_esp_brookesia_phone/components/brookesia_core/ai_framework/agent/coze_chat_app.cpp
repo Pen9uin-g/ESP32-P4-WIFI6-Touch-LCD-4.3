@@ -125,9 +125,6 @@ static void change_speaking_state(bool is_speaking, bool force = false)
     ESP_UTILS_LOGI("change_speaking_state: %d, force: %d", is_speaking, force);
 
     if (is_speaking) {
-        if (esp_gmf_afe_keep_awake(audio_processor_get_afe_handle(), true) != ESP_OK) {
-            ESP_UTILS_LOGE("Keep awake failed");
-        }
         if (!esp_timer_is_active(coze_chat.speaking_timeout_timer)) {
             ret = esp_timer_start_once(coze_chat.speaking_timeout_timer, SPEAKING_TIMEOUT_MS * 1000);
             if (ret != ESP_OK) {
@@ -135,9 +132,6 @@ static void change_speaking_state(bool is_speaking, bool force = false)
             }
         }
     } else {
-        if (esp_gmf_afe_keep_awake(audio_processor_get_afe_handle(), false) != ESP_OK) {
-            ESP_UTILS_LOGE("Keep awake failed");
-        }
         if (esp_timer_is_active(coze_chat.speaking_timeout_timer)) {
             ret = esp_timer_stop(coze_chat.speaking_timeout_timer);
             if (ret != ESP_OK) {

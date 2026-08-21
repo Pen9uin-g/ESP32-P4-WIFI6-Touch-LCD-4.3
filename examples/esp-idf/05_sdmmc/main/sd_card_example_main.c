@@ -8,6 +8,7 @@
 
 // This example uses SDMMC peripheral to communicate with SD card.
 
+#include <stdbool.h>
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
@@ -60,7 +61,7 @@ pin_configuration_t config = {
 };
 #endif //CONFIG_EXAMPLE_DEBUG_PIN_CONNECTIONS
 
-static esp_err_t s_example_write_file(const char *path, char *data)
+static esp_err_t s_example_write_file(const char *path, const char *data)
 {
     ESP_LOGI(TAG, "Opening file %s", path);
     FILE *f = fopen(path, "w");
@@ -68,8 +69,15 @@ static esp_err_t s_example_write_file(const char *path, char *data)
         ESP_LOGE(TAG, "Failed to open file for writing");
         return ESP_FAIL;
     }
-    fprintf(f, data);
-    fclose(f);
+    if (fputs(data, f) == EOF) {
+        ESP_LOGE(TAG, "Failed to write file");
+        fclose(f);
+        return ESP_FAIL;
+    }
+    if (fclose(f) != 0) {
+        ESP_LOGE(TAG, "Failed to close file after writing");
+        return ESP_FAIL;
+    }
     ESP_LOGI(TAG, "File written");
 
     return ESP_OK;
@@ -83,9 +91,16 @@ static esp_err_t s_example_read_file(const char *path)
         ESP_LOGE(TAG, "Failed to open file for reading");
         return ESP_FAIL;
     }
-    char line[EXAMPLE_MAX_CHAR_SIZE];
-    fgets(line, sizeof(line), f);
-    fclose(f);
+    char line[EXAMPLE_MAX_CHAR_SIZE] = {0};
+    if (fgets(line, sizeof(line), f) == NULL) {
+        ESP_LOGE(TAG, "Failed to read file");
+        fclose(f);
+        return ESP_FAIL;
+    }
+    if (fclose(f) != 0) {
+        ESP_LOGE(TAG, "Failed to close file after reading");
+        return ESP_FAIL;
+    }
 
     // strip newline
     char *pos = strchr(line, '\n');
@@ -99,7 +114,13 @@ static esp_err_t s_example_read_file(const char *path)
 
 void app_main(void)
 {
-    esp_err_t ret;
+    esp_err_t ret = ESP_OK;
+    sdmmc_card_t *card = NULL;
+    bool mounted = false;
+#if CONFIG_EXAMPLE_SD_PWR_CTRL_LDO_INTERNAL_IO
+    sd_pwr_ctrl_handle_t pwr_ctrl_handle = NULL;
+    bool release_power = true;
+#endif
 
     // Options for mounting the filesystem.
     // If format_if_mount_failed is set to true, SD card will be partitioned and
@@ -113,7 +134,6 @@ void app_main(void)
         .max_files = 5,
         .allocation_unit_size = 16 * 1024
     };
-    sdmmc_card_t *card;
     const char mount_point[] = MOUNT_POINT;
     ESP_LOGI(TAG, "Initializing SD card");
 
@@ -136,12 +156,10 @@ void app_main(void)
     sd_pwr_ctrl_ldo_config_t ldo_config = {
         .ldo_chan_id = CONFIG_EXAMPLE_SD_PWR_CTRL_LDO_IO_ID,
     };
-    sd_pwr_ctrl_handle_t pwr_ctrl_handle = NULL;
-
     ret = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &pwr_ctrl_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create a new on-chip LDO power control driver");
-        return;
+        goto cleanup;
     }
     host.pwr_ctrl_handle = pwr_ctrl_handle;
 #endif
@@ -189,8 +207,9 @@ void app_main(void)
             check_sd_card_pins(&config, pin_count);
 #endif
         }
-        return;
+        goto cleanup;
     }
+    mounted = true;
     ESP_LOGI(TAG, "Filesystem mounted");
 
     // Card has been initialized, print its properties
@@ -204,7 +223,7 @@ void app_main(void)
     snprintf(data, EXAMPLE_MAX_CHAR_SIZE, "%s %s!\n", "Hello", card->cid.name);
     ret = s_example_write_file(file_hello, data);
     if (ret != ESP_OK) {
-        return;
+        goto cleanup;
     }
 
     const char *file_foo = MOUNT_POINT"/foo.txt";
@@ -212,19 +231,22 @@ void app_main(void)
     struct stat st;
     if (stat(file_foo, &st) == 0) {
         // Delete it if it exists
-        unlink(file_foo);
+        if (unlink(file_foo) != 0) {
+            ESP_LOGE(TAG, "Failed to remove existing destination file");
+            goto cleanup;
+        }
     }
 
     // Rename original file
     ESP_LOGI(TAG, "Renaming file %s to %s", file_hello, file_foo);
     if (rename(file_hello, file_foo) != 0) {
         ESP_LOGE(TAG, "Rename failed");
-        return;
+        goto cleanup;
     }
 
     ret = s_example_read_file(file_foo);
     if (ret != ESP_OK) {
-        return;
+        goto cleanup;
     }
 
     // Format FATFS
@@ -232,12 +254,12 @@ void app_main(void)
     ret = esp_vfs_fat_sdcard_format(mount_point, card);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to format FATFS (%s)", esp_err_to_name(ret));
-        return;
+        goto cleanup;
     }
 
     if (stat(file_foo, &st) == 0) {
         ESP_LOGI(TAG, "file still exists");
-        return;
+        goto cleanup;
     } else {
         ESP_LOGI(TAG, "file doesn't exist, formatting done");
     }
@@ -248,25 +270,39 @@ void app_main(void)
     snprintf(data, EXAMPLE_MAX_CHAR_SIZE, "%s %s!\n", "Nihao", card->cid.name);
     ret = s_example_write_file(file_nihao, data);
     if (ret != ESP_OK) {
-        return;
+        goto cleanup;
     }
 
     //Open file for reading
     ret = s_example_read_file(file_nihao);
     if (ret != ESP_OK) {
-        return;
+        goto cleanup;
     }
 
-    // All done, unmount partition and disable SDMMC peripheral
-    esp_vfs_fat_sdcard_unmount(mount_point, card);
-    ESP_LOGI(TAG, "Card unmounted");
+cleanup:
+    if (mounted) {
+        esp_err_t unmount_ret = esp_vfs_fat_sdcard_unmount(mount_point, card);
+        if (unmount_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to unmount card (%s)", esp_err_to_name(unmount_ret));
+#if CONFIG_EXAMPLE_SD_PWR_CTRL_LDO_INTERNAL_IO
+            // The IDF unmount contract can fail before releasing the card/host.
+            release_power = false;
+#endif
+        } else {
+            ESP_LOGI(TAG, "Card unmounted");
+        }
+    }
 
     // Deinitialize the power control driver if it was used
 #if CONFIG_EXAMPLE_SD_PWR_CTRL_LDO_INTERNAL_IO
-    ret = sd_pwr_ctrl_del_on_chip_ldo(pwr_ctrl_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to delete the on-chip LDO power control driver");
-        return;
+    if (pwr_ctrl_handle != NULL && release_power) {
+        esp_err_t power_ret = sd_pwr_ctrl_del_on_chip_ldo(pwr_ctrl_handle);
+        if (power_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to delete the on-chip LDO power control driver (%s)",
+                     esp_err_to_name(power_ret));
+        }
+    } else if (pwr_ctrl_handle != NULL) {
+        ESP_LOGW(TAG, "Keeping SD power enabled because unmount did not complete");
     }
 #endif
 }

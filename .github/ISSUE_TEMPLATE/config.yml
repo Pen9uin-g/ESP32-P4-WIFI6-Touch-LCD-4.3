@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Waveshare product support
+    url: https://www.waveshare.com/contact_us
+    about: Use this channel for orders, warranty, and private customer information.
+  - name: 微雪技术支持
+    url: https://www.waveshare.net/help_center/contact.htm
+    about: 订单、保修及客户隐私信息请使用此渠道。

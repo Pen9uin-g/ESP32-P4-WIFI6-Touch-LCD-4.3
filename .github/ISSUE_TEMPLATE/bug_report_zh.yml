@@ -1,0 +1,79 @@
+name: 产品示例问题报告（中文）
+description: 报告本仓库中可复现的问题。
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: 请勿包含 Wi-Fi 凭据、令牌、私有路径、设备序列号或敏感安全细节。
+  - type: input
+    id: board
+    attributes:
+      label: 产品及硬件版本
+      placeholder: ESP32-P4-WIFI6-Touch-LCD-4.3，以及 PCB 上标注的版本
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题摘要
+      description: 请简要说明问题表现及首次出现的时间或条件。
+    validations:
+      required: true
+  - type: input
+    id: example
+    attributes:
+      label: 示例路径
+      placeholder: examples/esp-idf/09_video_lcd_display
+    validations:
+      required: true
+  - type: dropdown
+    id: firmware_source
+    attributes:
+      label: 软件或固件来源
+      options:
+        - 从本仓库源码构建或使用 CI 产物
+        - 仓库内的出厂或恢复镜像
+        - 其他有文档记录的镜像
+    validations:
+      required: true
+  - type: input
+    id: build_identity
+    attributes:
+      label: 构建或镜像标识
+      description: 请提供源码提交与配置、CI 产物名称，或精确的出厂/恢复镜像文件名。
+    validations:
+      required: true
+  - type: input
+    id: idf
+    attributes:
+      label: ESP-IDF 版本
+      placeholder: v5.5.5 或 v6.0.2；如有修改请提供精确提交
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 请包含配置修改、连接的外设以及最小可重复操作步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果与相关日志
+      render: shell
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: 公开数据确认
+      options:
+        - label: 我已移除凭据、私有路径、设备标识和无关日志。
+          required: true

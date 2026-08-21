@@ -279,10 +279,9 @@ static void extract_task(void *arg)
 
     ESP_LOGI(TAG, "Extract task stopped");
 
-    // Set stopped bit to indicate task has finished
+    // Signal that extractor access is finished, then wait for the owner to join/delete us.
     xEventGroupSetBits(adapter->extract_event_group, EXTRACT_TASK_STOPPED_BIT);
-
-    adapter->extract_task_handle = NULL;
+    vTaskSuspend(NULL);
     vTaskDelete(NULL);
 }
 
@@ -316,10 +315,10 @@ static esp_err_t start_extract_task(app_stream_adapter_t *adapter)
 }
 
 // Stop extraction task
-static void stop_extract_task(app_stream_adapter_t *adapter)
+static esp_err_t stop_extract_task(app_stream_adapter_t *adapter)
 {
     if (adapter->extract_task_handle == NULL) {
-        return;
+        return ESP_OK;
     }
 
     ESP_LOGI(TAG, "Stopping extract task");
@@ -335,10 +334,15 @@ static void stop_extract_task(app_stream_adapter_t *adapter)
 
     if (!(bits & EXTRACT_TASK_STOPPED_BIT)) {
         ESP_LOGW(TAG, "Extract task did not stop within timeout period");
+        return ESP_ERR_TIMEOUT;
     }
+
+    vTaskDelete(adapter->extract_task_handle);
+    adapter->extract_task_handle = NULL;
 
     // Clear stop bit for next time
     xEventGroupClearBits(adapter->extract_event_group, EXTRACT_TASK_STOP_BIT);
+    return ESP_OK;
 }
 
 esp_err_t app_stream_adapter_init(const app_stream_adapter_config_t *config,
@@ -461,7 +465,10 @@ esp_err_t app_stream_adapter_set_file(app_stream_adapter_handle_t handle,
     app_stream_adapter_t *adapter = (app_stream_adapter_t *)handle;
 
     if (adapter->running) {
-        app_stream_adapter_stop(handle);
+        esp_err_t ret = app_stream_adapter_stop(handle);
+        if (ret != ESP_OK) {
+            return ret;
+        }
     }
 
     adapter->filename = filename;
@@ -556,10 +563,17 @@ esp_err_t app_stream_adapter_stop(app_stream_adapter_handle_t handle)
 
     ESP_LOGI(TAG, "Stopping playback");
 
-    stop_extract_task(adapter);
-    app_extractor_stop(adapter->extractor_handle);
+    esp_err_t ret = stop_extract_task(adapter);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
+    ret = app_extractor_stop(adapter->extractor_handle);
     adapter->running = false;
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
     return ESP_OK;
 }
 
@@ -576,13 +590,24 @@ esp_err_t app_stream_adapter_seek(app_stream_adapter_handle_t handle, uint32_t p
 
     bool was_running = adapter->extract_task_handle != NULL;
     if (was_running) {
-        stop_extract_task(adapter);
+        ret = stop_extract_task(adapter);
+        if (ret != ESP_OK) {
+            return ret;
+        }
     }
 
     ret = app_extractor_seek(adapter->extractor_handle, position);
 
     if (was_running) {
-        start_extract_task(adapter);
+        esp_err_t start_ret = start_extract_task(adapter);
+        if (start_ret != ESP_OK) {
+            esp_err_t stop_ret = app_extractor_stop(adapter->extractor_handle);
+            adapter->running = false;
+            if (stop_ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to stop extractor after task restart failure: %d", stop_ret);
+            }
+            return start_ret;
+        }
     }
 
     return ret;
@@ -642,7 +667,10 @@ esp_err_t app_stream_adapter_deinit(app_stream_adapter_handle_t handle)
     app_stream_adapter_t *adapter = (app_stream_adapter_t *)handle;
 
     if (adapter->running) {
-        app_stream_adapter_stop(handle);
+        esp_err_t ret = app_stream_adapter_stop(handle);
+        if (ret != ESP_OK) {
+            return ret;
+        }
     }
 
     if (adapter->extractor_handle != NULL) {

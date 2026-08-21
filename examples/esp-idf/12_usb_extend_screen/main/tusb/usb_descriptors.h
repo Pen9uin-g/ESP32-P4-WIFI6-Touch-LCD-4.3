@@ -71,20 +71,16 @@ enum {
       /* Input */ \
       /* Finger */ \
       FINGER_USAGE(width, height) \
-      FINGER_USAGE(width, height) \
-      FINGER_USAGE(width, height) \
-      FINGER_USAGE(width, height) \
-      FINGER_USAGE(width, height) \
       /* Contact count */\
       HID_USAGE     ( 0x54                                   ),\
-      HID_LOGICAL_MAX ( 127                                    ),\
+      HID_LOGICAL_MAX ( 1                                      ),\
       HID_REPORT_COUNT( 1                                    ),\
       HID_REPORT_SIZE ( 8                                    ),\
       HID_INPUT      ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),\
     HID_REPORT_ID ( report_id + 1             ) \
     HID_USAGE (0x55              ),\
     HID_REPORT_COUNT (1               ),\
-    HID_LOGICAL_MAX (0x10              ),\
+    HID_LOGICAL_MAX (0x01              ),\
     HID_FEATURE ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),\
     HID_COLLECTION_END \
 

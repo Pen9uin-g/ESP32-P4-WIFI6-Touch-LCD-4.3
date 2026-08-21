@@ -1,0 +1,186 @@
+name: ESP-IDF examples
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Direct ESP-IDF example directory name, path, or all"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: esp-idf-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    name: Preflight and route changes
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.examples.outputs.matrix }}
+      has_examples: ${{ steps.examples.outputs.has_examples }}
+      examples: ${{ steps.examples.outputs.examples }}
+      route: ${{ steps.examples.outputs.route }}
+      docs_only: ${{ steps.examples.outputs.docs_only }}
+      firmware_changes: ${{ steps.examples.outputs.firmware_changes }}
+      release_review: ${{ steps.examples.outputs.release_review }}
+      unknown_paths: ${{ steps.examples.outputs.unknown_paths }}
+      build_count: ${{ steps.examples.outputs.build_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Route changed ESP-IDF examples
+        id: examples
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PROJECT_INPUT: ${{ inputs.project }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            python .github/scripts/discover_esp_idf_examples.py \
+              --example "$PROJECT_INPUT"
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            python .github/scripts/discover_esp_idf_examples.py \
+              --base-ref "$PR_BASE_SHA" \
+              --head-ref "$PR_HEAD_SHA"
+          else
+            python .github/scripts/discover_esp_idf_examples.py \
+              --base-ref "$PUSH_BEFORE_SHA" \
+              --head-ref "$PUSH_HEAD_SHA"
+          fi
+
+      - name: Test repository CI helpers
+        run: python .github/tests/run_tests.py
+
+      - name: Test shared CI firmware flasher offline
+        run: |
+          python scripts/ci_firmware.py self-test
+          sh Flash-CI-Firmware.sh self-test
+
+      - name: Audit repository metadata and local links
+        run: python .github/scripts/check_repository.py
+
+      - name: Audit Markdown and public text
+        shell: bash
+        env:
+          DOCS_ONLY: ${{ steps.examples.outputs.docs_only }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$PUSH_BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            python .github/scripts/audit_markdown.py . --all --config .github/markdown-audit.json
+          else
+            docs_only_args=()
+            if [[ "$DOCS_ONLY" == "true" ]]; then
+              docs_only_args+=(--expect-docs-only)
+            fi
+            if [[ "$EVENT_NAME" == "pull_request" ]]; then
+              python .github/scripts/audit_markdown.py . \
+                --base "$PR_BASE_SHA" \
+                --config .github/markdown-audit.json \
+                "${docs_only_args[@]}"
+            else
+              python .github/scripts/audit_markdown.py . \
+                --base "$PUSH_BEFORE_SHA" \
+                --config .github/markdown-audit.json \
+                "${docs_only_args[@]}"
+            fi
+          fi
+
+      - name: Summary
+        env:
+          BUILD_COUNT: ${{ steps.examples.outputs.build_count }}
+          EXAMPLES: ${{ steps.examples.outputs.examples }}
+          FIRMWARE_CHANGES: ${{ steps.examples.outputs.firmware_changes }}
+          ROUTE: ${{ steps.examples.outputs.route }}
+          UNKNOWN_PATHS: ${{ steps.examples.outputs.unknown_paths }}
+        shell: bash
+        run: |
+          {
+            echo "### ESP-IDF CI route"
+            echo
+            echo "- Route: \`$ROUTE\`"
+            echo "- Build jobs: $BUILD_COUNT"
+            if [[ -n "$EXAMPLES" ]]; then
+              echo "- Selected examples:"
+              echo "$EXAMPLES" | tr ',' '\n' | sed '/^$/d' | sed 's/^/  - /'
+            fi
+            if [[ "$FIRMWARE_CHANGES" == "true" ]]; then
+              echo "- Factory firmware changed: release-owner review is required; binaries are not rebuilt here."
+            fi
+            if [[ -n "$UNKNOWN_PATHS" ]]; then
+              echo "- Unknown paths forced the conservative full matrix: \`$UNKNOWN_PATHS\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build ${{ matrix.example }} (${{ matrix.idf_version }}, ${{ matrix.variant }})
+    needs: discover
+    if: needs.discover.outputs.has_examples == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Build default configuration
+        if: matrix.sdkconfig_defaults == ''
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf_version }}
+          target: esp32p4
+          path: ${{ matrix.example }}
+
+      - name: Build ${{ matrix.variant }} configuration
+        if: matrix.sdkconfig_defaults != ''
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf_version }}
+          target: esp32p4
+          path: ${{ matrix.example }}
+          command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;${{ matrix.sdkconfig_defaults }}" build
+
+      - name: Package flashable CI artifact
+        env:
+          PACKAGE_GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PACKAGE_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python releases/package_firmware.py \
+            --project "${{ matrix.example }}" \
+            --build-dir "${{ matrix.example }}/build" \
+            --framework-version "${{ matrix.idf_version }}" \
+            --variant "${{ matrix.variant }}" \
+            --output-dir ci-firmware
+
+      - name: Upload flashable CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ci-firmware/${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+          retention-days: 7

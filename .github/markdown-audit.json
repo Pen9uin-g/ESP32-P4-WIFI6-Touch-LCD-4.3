@@ -1,0 +1,113 @@
+{
+  "classification_rules": [
+    {
+      "category": "third_party",
+      "patterns": [
+        "examples/esp-idf/10_mp4_player/components/esp_extractor/**"
+      ]
+    },
+    {
+      "category": "first_party_customer",
+      "patterns": [
+        "examples/esp-idf/09_video_lcd_display/README*.md",
+        "examples/esp-idf/10_mp4_player/README*.md",
+        "examples/esp-idf/11_esp_brookesia_phone/README*.md"
+      ]
+    },
+    {
+      "category": "first_party_maintainer",
+      "patterns": [
+        "docs/**"
+      ]
+    }
+  ],
+  "bilingual_pairs": [
+    {
+      "english": "README.md",
+      "chinese": "README_ZH.md"
+    },
+    {
+      "english": "CONTRIBUTING.md",
+      "chinese": "CONTRIBUTING_ZH.md"
+    },
+    {
+      "english": "SUPPORT.md",
+      "chinese": "SUPPORT_ZH.md"
+    },
+    {
+      "english": "docs/README.md",
+      "chinese": "docs/README_ZH.md"
+    },
+    {
+      "english": "docs/CI.md",
+      "chinese": "docs/CI_ZH.md"
+    },
+    {
+      "english": "docs/COMPONENTS.md",
+      "chinese": "docs/COMPONENTS_ZH.md"
+    },
+    {
+      "english": "docs/HARDWARE.md",
+      "chinese": "docs/HARDWARE_ZH.md"
+    },
+    {
+      "english": "examples/esp-idf/09_video_lcd_display/README.md",
+      "chinese": "examples/esp-idf/09_video_lcd_display/README_ZH.md"
+    },
+    {
+      "english": "examples/esp-idf/10_mp4_player/README.md",
+      "chinese": "examples/esp-idf/10_mp4_player/README_ZH.md"
+    },
+    {
+      "english": "examples/esp-idf/11_esp_brookesia_phone/README.md",
+      "chinese": "examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"
+    }
+  ],
+  "homepage_pairs": [
+    {
+      "english": "README.md",
+      "chinese": "README_ZH.md",
+      "profile": "single-product",
+      "required_components": [
+        "centered_header",
+        "html_h1",
+        "subtitle",
+        "badges",
+        "language_switch",
+        "quick_links",
+        "hero_image",
+        "separator",
+        "h2"
+      ],
+      "required_quick_links": [
+        "product",
+        "documentation",
+        "firmware",
+        "esp_idf"
+      ],
+      "required_badges": [
+        "build",
+        "license"
+      ],
+      "required_h2_icons": [
+        "✨",
+        "🖥️",
+        "📦",
+        "🧪",
+        "🛠️",
+        "🗂️",
+        "📚",
+        "🤝",
+        "📄"
+      ],
+      "h3_emoji_allow_patterns": []
+    }
+  ],
+  "pair_exempt_patterns": [
+    ".github/pull_request_template.md"
+  ],
+  "docs_only_allowed_patterns": [
+    "assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg",
+    "schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf"
+  ]
+}

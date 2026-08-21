@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdlib.h>
 #include "app_usb.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "tusb.h"
@@ -27,16 +31,22 @@ static tinyusb_hid_t *s_tinyusb_hid = NULL;
 // HID callbacks
 //--------------------------------------------------------------------+
 
-void tinyusb_hid_keyboard_report(hid_report_t report)
+esp_err_t tinyusb_hid_keyboard_report(hid_report_t report)
 {
+    ESP_RETURN_ON_FALSE(s_tinyusb_hid && s_tinyusb_hid->hid_queue, ESP_ERR_INVALID_STATE, TAG,
+                        "HID is not initialized");
+
     // Remote wakeup
     if (tud_suspended()) {
         // Wake up host if we are in suspend mode
         // and REMOTE_WAKEUP feature is enabled by host
         tud_remote_wakeup();
+        return ESP_OK;
     } else {
-        xQueueSend(s_tinyusb_hid->hid_queue, &report, 0);
+        ESP_RETURN_ON_FALSE(xQueueSend(s_tinyusb_hid->hid_queue, &report, 0) == pdPASS,
+                            ESP_ERR_NO_MEM, TAG, "HID report queue is full");
     }
+    return ESP_OK;
 }
 
 // tinyusb_hid_task function to process the HID reports
@@ -54,7 +64,12 @@ static void tinyusb_hid_task(void *arg)
                 xQueueReset(s_tinyusb_hid->hid_queue);
             } else {
                 if (report.report_id == REPORT_ID_TOUCH) {
-                    tud_hid_n_report(0, REPORT_ID_TOUCH, &report.touch_report, sizeof(report.touch_report));
+                    // A completion that arrived after an earlier timeout must not release this report.
+                    ulTaskNotifyTake(pdTRUE, 0);
+                    if (!tud_hid_n_report(0, REPORT_ID_TOUCH, &report.touch_report, sizeof(report.touch_report))) {
+                        ESP_LOGW(TAG, "HID endpoint is not ready");
+                        continue;
+                    }
                 } else {
                     // Unknown report
                     continue;
@@ -81,12 +96,14 @@ esp_err_t app_hid_init(void)
     s_tinyusb_hid->hid_queue = xQueueCreate(10, sizeof(hid_report_t));   // Adjust queue length and item size as per your requirement
     ESP_GOTO_ON_FALSE(s_tinyusb_hid->hid_queue, ESP_ERR_NO_MEM, fail, TAG, "xQueueCreate failed");
 
-    xTaskCreate(tinyusb_hid_task, "tinyusb_hid_task", 4096, NULL, CONFIG_HID_TASK_PRIORITY, &s_tinyusb_hid->task_handle);
-    /*!< Make sure tinyusb_hid_task create successfully */
-    ESP_GOTO_ON_FALSE(s_tinyusb_hid->task_handle, ESP_ERR_NO_MEM, fail, TAG, "xQueueCreate failed");
-    xTaskNotifyGive(s_tinyusb_hid->task_handle);
+    BaseType_t task_created = xTaskCreate(tinyusb_hid_task, "tinyusb_hid_task", 4096, NULL,
+                                          CONFIG_HID_TASK_PRIORITY, &s_tinyusb_hid->task_handle);
+    ESP_GOTO_ON_FALSE(task_created == pdPASS, ESP_ERR_NO_MEM, fail, TAG, "xTaskCreate failed");
     return ESP_OK;
 fail:
+    if (s_tinyusb_hid->hid_queue) {
+        vQueueDelete(s_tinyusb_hid->hid_queue);
+    }
     free(s_tinyusb_hid);
     s_tinyusb_hid = NULL;
     return ret;
@@ -98,8 +115,11 @@ fail:
 void tud_hid_report_complete_cb(uint8_t itf, uint8_t const *report, uint16_t len)
 {
     (void) itf;
+    (void) report;
     (void) len;
-    xTaskNotifyGive(s_tinyusb_hid->task_handle);
+    if (s_tinyusb_hid && s_tinyusb_hid->task_handle) {
+        xTaskNotifyGive(s_tinyusb_hid->task_handle);
+    }
 }
 
 // Invoked when received GET_REPORT control request
@@ -109,14 +129,14 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
 {
     // TODO not Implemented
     (void) itf;
-    (void) report_id;
     (void) report_type;
-    (void) buffer;
-    (void) reqlen;
 
     switch (report_id) {
     case REPORT_ID_MAX_COUNT: {
-        buffer[0] = CONFIG_ESP_LCD_TOUCH_MAX_POINTS;
+        if (!buffer || reqlen < 1) {
+            return 0;
+        }
+        buffer[0] = USB_HID_TOUCH_MAX_POINTS;
         return 1;
     }
     default: {

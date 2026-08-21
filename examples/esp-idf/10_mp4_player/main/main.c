@@ -20,7 +20,15 @@
 
 static const char *TAG = "main";
 
-#define DISPLAY_BUFFER_SIZE (BSP_LCD_H_RES * BSP_LCD_V_RES * 2)
+#if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
+#define DISPLAY_BYTES_PER_PIXEL 3
+#define DISPLAY_JPEG_CONFIG_DEFAULT() APP_STREAM_JPEG_CONFIG_DEFAULT_RGB888()
+#else
+#define DISPLAY_BYTES_PER_PIXEL 2
+#define DISPLAY_JPEG_CONFIG_DEFAULT() APP_STREAM_JPEG_CONFIG_DEFAULT_RGB565()
+#endif
+
+#define DISPLAY_BUFFER_SIZE (BSP_LCD_H_RES * BSP_LCD_V_RES * DISPLAY_BYTES_PER_PIXEL)
 
 #define MP4_FILENAME   BSP_SD_MOUNT_POINT "/" CONFIG_MP4_FILENAME
 
@@ -35,13 +43,13 @@ static void play_media_file(const char *filename);
 
 static bool flush_dpi_panel_ready_callback(esp_lcd_panel_handle_t panel_io, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx)
 {
-    BaseType_t taskAwake = pdFALSE;
+    BaseType_t task_awake = pdFALSE;
 
     if (trans_sem) {
-        xSemaphoreGiveFromISR(trans_sem, &taskAwake);
+        xSemaphoreGiveFromISR(trans_sem, &task_awake);
     }
 
-    return false;
+    return task_awake == pdTRUE;
 }
 
 static esp_err_t display_decoded_frame(uint8_t *buffer, uint32_t buffer_size,
@@ -49,8 +57,16 @@ static esp_err_t display_decoded_frame(uint8_t *buffer, uint32_t buffer_size,
                                        uint32_t buffer_index, void *user_data)
 {
     // user_data can be used to pass context information such as LCD handle or display state
-    esp_lcd_panel_draw_bitmap(lcd_panel, 0, 0, width, height, buffer);
+    if (trans_sem == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     xSemaphoreTake(trans_sem, 0);
+    esp_err_t ret = esp_lcd_panel_draw_bitmap(lcd_panel, 0, 0, width, height, buffer);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to draw decoded frame: %s", esp_err_to_name(ret));
+        return ret;
+    }
     xSemaphoreTake(trans_sem, portMAX_DELAY);
 
     return ESP_OK;
@@ -58,7 +74,7 @@ static esp_err_t display_decoded_frame(uint8_t *buffer, uint32_t buffer_size,
 
 void app_main()
 {
-    ESP_LOGI(TAG, "Starting HDMI MP4 Player application");
+    ESP_LOGI(TAG, "Starting onboard LCD media player application");
 
     // Initialize display
     esp_err_t ret = bsp_display_new(NULL, &lcd_panel, &lcd_io);
@@ -71,10 +87,20 @@ void app_main()
     // esp_lcd_panel_mirror(lcd_panel, true, true);
 
     trans_sem = xSemaphoreCreateBinary();
+    if (trans_sem == NULL) {
+        ESP_LOGE(TAG, "Failed to create display transaction semaphore");
+        return;
+    }
     esp_lcd_dpi_panel_event_callbacks_t callbacks = {
         .on_refresh_done = flush_dpi_panel_ready_callback,
     };
-    esp_lcd_dpi_panel_register_event_callbacks(lcd_panel, &callbacks, NULL);
+    ret = esp_lcd_dpi_panel_register_event_callbacks(lcd_panel, &callbacks, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register display callbacks: %s", esp_err_to_name(ret));
+        vSemaphoreDelete(trans_sem);
+        trans_sem = NULL;
+        return;
+    }
 
     ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(lcd_panel, CONFIG_BSP_LCD_DPI_BUFFER_NUMS, &lcd_buffer[0], &lcd_buffer[1]));
 
@@ -109,7 +135,7 @@ void app_main()
         .buffer_count = CONFIG_BSP_LCD_DPI_BUFFER_NUMS,
         .buffer_size = DISPLAY_BUFFER_SIZE,
         .audio_dev = audio_dev,
-        .jpeg_config = APP_STREAM_JPEG_CONFIG_DEFAULT_RGB565()
+        .jpeg_config = DISPLAY_JPEG_CONFIG_DEFAULT()
     };
 
     ret = app_stream_adapter_init(&adapter_config, &stream_adapter);
@@ -129,7 +155,11 @@ void app_main()
     if (fp) {
         fclose(fp);
 
-        app_stream_adapter_set_file(stream_adapter, MP4_FILENAME, g_audio_dev != NULL);
+        ret = app_stream_adapter_set_file(stream_adapter, MP4_FILENAME, g_audio_dev != NULL);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set media file: %s", esp_err_to_name(ret));
+            return;
+        }
         play_media_file(MP4_FILENAME);
     } else {
         ESP_LOGW(TAG, "MP4 file not found: %s", MP4_FILENAME);
@@ -191,8 +221,16 @@ static void play_media_file(const char *filename)
         }
 
         // Stop and reset for next loop
-        app_stream_adapter_stop(stream_adapter);
+        ret = app_stream_adapter_stop(stream_adapter);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to stop playback safely: %s", esp_err_to_name(ret));
+            break;
+        }
         vTaskDelay(pdMS_TO_TICKS(200)); // Brief pause
-        app_stream_adapter_set_file(stream_adapter, filename, g_audio_dev != NULL);
+        ret = app_stream_adapter_set_file(stream_adapter, filename, g_audio_dev != NULL);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to reset media file: %s", esp_err_to_name(ret));
+            break;
+        }
     }
 }

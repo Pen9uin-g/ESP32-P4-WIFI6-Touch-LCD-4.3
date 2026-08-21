@@ -12,3 +12,8 @@
 **/dependencies.lock
 **/sdkconfig
 **/sdkconfig.old
+**/__pycache__
+**/*.pyc
+/ci-firmware/
+/releases/output/
+/releases/downloads/
