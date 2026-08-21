@@ -61,12 +61,8 @@ jobs:
               --base-ref "$PR_BASE_SHA" \
               --head-ref "$PR_HEAD_SHA"
           else
-            before="$PUSH_BEFORE_SHA"
-            if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
-              before=""
-            fi
             python .github/scripts/discover_esp_idf_examples.py \
-              --base-ref "$before" \
+              --base-ref "$PUSH_BEFORE_SHA" \
               --head-ref "$PUSH_HEAD_SHA"
           fi
 

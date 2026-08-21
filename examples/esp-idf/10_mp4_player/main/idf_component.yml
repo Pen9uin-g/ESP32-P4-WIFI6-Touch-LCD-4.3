@@ -7,7 +7,7 @@ dependencies:
     version: ac94f5da7c0e44963828ab970337e89d23e04330
 
   espressif/esp_audio_codec:
-    # v2.6+ requires ESP32-P4 silicon revision 3.0 or newer. This product's
-    # defaults intentionally support earlier P4 revisions.
+    # v2.6+ requires ESP32-P4 silicon revision 3.0 or newer. The explicit
+    # rev1_3 compatibility profile still supports pre-v3 P4 silicon.
     version: ">=2.3.0,<2.6.0"
     public: true

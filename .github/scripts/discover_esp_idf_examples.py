@@ -34,6 +34,13 @@ GLOBAL_BUILD_PATTERNS = (
     "scripts/Flash-CI-Firmware.ps1",
     "scripts/ci_firmware.py",
 )
+ARDUINO_PATTERNS = (
+    "examples/arduino/examples/**",
+    "examples/arduino/libraries/**",
+    ".github/workflows/arduino-examples.yml",
+    ".github/scripts/discover_arduino_examples.py",
+    ".github/tests/test_discover_arduino_examples.py",
+)
 DOCUMENTATION_ASSET_PATTERNS = (
     "assets/ESP32-P4-WIFI6-Touch-LCD-4.3-details-1.jpg",
     "schematic/ESP32-P4-WIFI6-Touch-LCD-4.3-schematic.pdf",
@@ -50,6 +57,7 @@ NON_BUILD_PATTERNS = (
     ".github/pull_request_template.md",
 )
 FIRMWARE_PATTERNS = ("firmware/**", "Firmware/**", "FirmWare/**")
+ZERO_GIT_SHA = "0" * 40
 
 # Extra lanes are intentionally small and target conditional code that the
 # default sdkconfig does not compile. Paths are relative to each example.
@@ -161,6 +169,7 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
     unknown: set[str] = set()
     docs = False
     firmware = False
+    arduino = False
     global_build = False
     non_build = False
 
@@ -168,6 +177,8 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
         path = normalize_path(raw_path)
         if matches_any(path, FIRMWARE_PATTERNS):
             firmware = True
+        elif matches_any(path, ARDUINO_PATTERNS):
+            arduino = True
         elif matches_any(path, NON_BUILD_PATTERNS):
             non_build = True
         elif path.lower().endswith(".md") or matches_any(path, DOCUMENTATION_ASSET_PATTERNS):
@@ -192,6 +203,8 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
         kind = "examples"
     elif firmware:
         kind = "firmware"
+    elif arduino:
+        kind = "arduino"
     elif docs and not non_build:
         kind = "docs"
     else:
@@ -202,6 +215,7 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
         and not non_build
         and not selected
         and not firmware
+        and not arduino
         and not unknown
         and not global_build
     )
@@ -216,18 +230,9 @@ def classify_paths(paths: list[str], known_examples: set[str]) -> Route:
 
 
 def discover_changed_route(base_ref: str | None, head_ref: str, known_examples: set[str]) -> Route:
-    if base_ref:
-        diff_args = ["diff", "--name-status", "--find-renames", f"{base_ref}...{head_ref}"]
-    else:
-        diff_args = [
-            "diff-tree",
-            "--root",
-            "--no-commit-id",
-            "--name-status",
-            "--find-renames",
-            "-r",
-            head_ref,
-        ]
+    if not base_ref or base_ref == ZERO_GIT_SHA:
+        return Route(tuple(sorted(known_examples)), "initial_push")
+    diff_args = ["diff", "--name-status", "--find-renames", f"{base_ref}...{head_ref}"]
     return classify_paths(paths_from_name_status(run_git(diff_args)), known_examples)
 
 
@@ -237,12 +242,13 @@ def _idf_major(idf_version: str) -> int:
 
 def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str], ...]:
     name = PurePosixPath(example).name
-    variants: list[tuple[str, str]] = [("default", "")]
+    rev3_defaults = "../../../config/ci/rev3_x.defaults"
+    variants: list[tuple[str, str]] = [("default", rev3_defaults)]
     if name == "06_I2SCodec":
-        variants.append(("echo", "../../../config/ci/i2s_echo.defaults"))
+        variants.append(("echo", f"{rev3_defaults};../../../config/ci/i2s_echo.defaults"))
     if name in RGB888_EXAMPLES:
         overlay = "usb_rgb888.defaults" if name == "12_usb_extend_screen" else "rgb888.defaults"
-        variants.append(("rgb888", f"../../../config/ci/{overlay}"))
+        variants.append(("rgb888", f"{rev3_defaults};../../../config/ci/{overlay}"))
     if name == "11_esp_brookesia_phone" and _idf_major(idf_version) < 6:
         # The GMF 0.6.x AI components (esp_coze, gmf_core, gmf_io, ...) call
         # idf_build_set_property at the top level of their CMakeLists.txt.
@@ -251,9 +257,9 @@ def variants_for_example(example: str, idf_version: str) -> tuple[tuple[str, str
         # defined, so the AI overlay only builds on the v5.x line. It stays a
         # v5-only lane until the coherent GMF set is upgraded to an ESP-IDF v6
         # compatible release (see docs/COMPONENTS.md).
-        variants.append(("ai", "../../../config/ci/brookesia_ai.defaults"))
+        variants.append(("ai", f"{rev3_defaults};../../../config/ci/brookesia_ai.defaults"))
     if name == "12_usb_extend_screen":
-        variants.append(("minimal", "../../../config/ci/usb_minimal.defaults"))
+        variants.append(("minimal", f"{rev3_defaults};../../../config/ci/usb_minimal.defaults"))
     return tuple(variants)
 
 

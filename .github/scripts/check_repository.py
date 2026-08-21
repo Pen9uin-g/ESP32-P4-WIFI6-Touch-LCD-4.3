@@ -25,6 +25,7 @@ REQUIRED_PAIRS = (
     ("docs/CI_FIRMWARE.md", "docs/CI_FIRMWARE_ZH.md"),
     ("docs/COMPONENTS.md", "docs/COMPONENTS_ZH.md"),
     ("docs/HARDWARE.md", "docs/HARDWARE_ZH.md"),
+    ("examples/arduino/README.md", "examples/arduino/README_ZH.md"),
     (
         "examples/esp-idf/09_video_lcd_display/README.md",
         "examples/esp-idf/09_video_lcd_display/README_ZH.md",
@@ -39,6 +40,8 @@ REQUIRED_PAIRS = (
     ),
 )
 REQUIRED_CI_DEFAULTS = (
+    "config/ci/rev3_x.defaults",
+    "config/ci/rev1_3.defaults",
     "config/ci/i2s_echo.defaults",
     "config/ci/rgb888.defaults",
     "config/ci/usb_rgb888.defaults",
@@ -46,7 +49,14 @@ REQUIRED_CI_DEFAULTS = (
     "config/ci/usb_minimal.defaults",
 )
 REQUIRED_CI_HELPERS = (
+    ".github/workflows/esp-idf-examples.yml",
+    ".github/workflows/arduino-examples.yml",
     ".github/scripts/audit_markdown.py",
+    ".github/scripts/discover_esp_idf_examples.py",
+    ".github/scripts/discover_arduino_examples.py",
+    ".github/tests/run_tests.py",
+    ".github/tests/test_discover_esp_idf_examples.py",
+    ".github/tests/test_discover_arduino_examples.py",
 )
 REQUIRED_HOMEPAGE_COMPONENTS = {
     "centered_header",
@@ -216,6 +226,75 @@ def duplicate_sdkconfig_assignment_errors(defaults: str, relative: str) -> list[
     assignments = re.findall(r"(?m)^(CONFIG_[A-Za-z0-9_]+)=", defaults)
     duplicates = sorted({key for key in assignments if assignments.count(key) > 1})
     return [f"{relative}: repeated sdkconfig assignment {key}" for key in duplicates]
+
+
+def sdkconfig_assignments(defaults: str) -> dict[str, str]:
+    """Return the final values from one or more SDKCONFIG_DEFAULTS files.
+
+    ESP-IDF accepts both active assignments and the standard ``# CONFIG_X is
+    not set`` form. Keeping the latter matters here because the explicit
+    Rev1.3 overlay must override the repository's Rev3.x defaults without
+    leaving either hardware-revision choice active.
+    """
+    assignments: dict[str, str] = {}
+    for line in defaults.splitlines():
+        active = re.fullmatch(r"(CONFIG_[A-Za-z0-9_]+)=(.+)", line)
+        if active:
+            assignments[active.group(1)] = active.group(2)
+            continue
+        disabled = re.fullmatch(r"# (CONFIG_[A-Za-z0-9_]+) is not set", line)
+        if disabled:
+            assignments[disabled.group(1)] = "n"
+    return assignments
+
+
+def revision_profile_errors(repo_root: Path, examples: list[Path]) -> list[str]:
+    """Require conflict-free Rev3.x defaults and the runnable Rev1.3 overlay."""
+    profiles = {
+        "rev3_x": {
+            "CONFIG_ESP32P4_SELECTS_REV_LESS_V3": "n",
+            "CONFIG_ESP32P4_REV_MIN_100": "n",
+            "CONFIG_ESP32P4_REV_MIN_300": "y",
+            "CONFIG_SPIRAM": "y",
+            "CONFIG_SPIRAM_SPEED_200M": "n",
+            "CONFIG_SPIRAM_SPEED_250M": "y",
+            "CONFIG_BOOTLOADER_LOG_LEVEL_WARN": "y",
+            "CONFIG_BOOTLOADER_LOG_LEVEL": "2",
+        },
+        "rev1_3": {
+            "CONFIG_ESP32P4_SELECTS_REV_LESS_V3": "y",
+            "CONFIG_ESP32P4_REV_MIN_100": "y",
+            "CONFIG_ESP32P4_REV_MIN_300": "n",
+            "CONFIG_SPIRAM": "y",
+            "CONFIG_SPIRAM_SPEED_200M": "y",
+            "CONFIG_SPIRAM_SPEED_250M": "n",
+            "CONFIG_BOOTLOADER_LOG_LEVEL_WARN": "y",
+            "CONFIG_BOOTLOADER_LOG_LEVEL": "2",
+        },
+    }
+    errors: list[str] = []
+    overlays: dict[str, str] = {}
+    for name in profiles:
+        path = repo_root / "config" / "ci" / f"{name}.defaults"
+        try:
+            overlays[name] = path.read_text(encoding="utf-8")
+        except OSError as error:
+            errors.append(f"{path.relative_to(repo_root)}: cannot read revision profile: {error}")
+    if errors:
+        return errors
+
+    for example in examples:
+        defaults = example / "sdkconfig.defaults"
+        base = defaults.read_text(encoding="utf-8")
+        relative = defaults.relative_to(repo_root).as_posix()
+        for name, expected in profiles.items():
+            combined = sdkconfig_assignments(f"{base}\n{overlays[name]}")
+            for key, value in expected.items():
+                if combined.get(key) != value:
+                    errors.append(
+                        f"{relative}: {name} profile must resolve {key}={value}"
+                    )
+    return errors
 
 
 def strip_c_comments_and_literals(source: str) -> str:
@@ -446,6 +525,14 @@ def homepage_policy_errors(audit_policy: object) -> list[str]:
     return errors
 
 
+def required_ci_helper_errors(repo_root: Path) -> list[str]:
+    return [
+        f"missing CI helper: {relative}"
+        for relative in REQUIRED_CI_HELPERS
+        if not (repo_root / relative).is_file()
+    ]
+
+
 def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
     errors: list[str] = []
     examples = direct_examples(repo_root)
@@ -462,9 +549,7 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         if not (repo_root / relative).is_file():
             errors.append(f"missing CI sdkconfig overlay: {relative}")
 
-    for relative in REQUIRED_CI_HELPERS:
-        if not (repo_root / relative).is_file():
-            errors.append(f"missing CI helper: {relative}")
+    errors.extend(required_ci_helper_errors(repo_root))
 
     errors.extend(bsp_pin_policy_errors(repo_root))
 
@@ -488,6 +573,8 @@ def repository_errors(repo_root: Path = REPO_ROOT) -> list[str]:
         for stale_key in ("CONFIG_BSP_LCD_TYPE_HDMI", "CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A"):
             if stale_key in text:
                 errors.append(f"{relative}: stale non-product setting {stale_key}")
+
+    errors.extend(revision_profile_errors(repo_root, examples))
 
     wifi_source = (
         repo_root / "examples" / "esp-idf" / "04_wifistation" / "main" / "station_example_main.c"

@@ -111,6 +111,32 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertFalse(route.docs_only)
                 self.assertEqual(route.selected, ())
 
+    def test_arduino_only_changes_do_not_select_idf_builds(self) -> None:
+        route = discover.classify_paths(
+            ["examples/arduino/examples/01_HelloWorld/01_HelloWorld.ino"],
+            {"examples/esp-idf/01_demo"},
+        )
+        self.assertEqual(route.kind, "arduino")
+        self.assertFalse(route.docs_only)
+        self.assertEqual(route.selected, ())
+
+    def test_arduino_readme_is_documentation_only(self) -> None:
+        route = discover.classify_paths(
+            ["examples/arduino/README.md"],
+            {"examples/esp-idf/01_demo"},
+        )
+        self.assertEqual(route.kind, "docs")
+        self.assertTrue(route.docs_only)
+        self.assertEqual(route.selected, ())
+
+    def test_missing_or_zero_push_base_selects_full_matrix(self) -> None:
+        examples = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
+        for base in (None, "0" * 40):
+            route = discover.discover_changed_route(base, "HEAD", examples)
+            self.assertEqual(route.kind, "initial_push")
+            self.assertEqual(route.selected, tuple(sorted(examples)))
+            self.assertEqual(len(discover.build_matrix(route.selected)["include"]), 4)
+
     def test_direct_example_selects_only_its_parent(self) -> None:
         known = {"examples/esp-idf/01_demo", "examples/esp-idf/02_demo"}
         route = discover.classify_paths(
@@ -188,8 +214,8 @@ class DiscoveryTests(unittest.TestCase):
             )
             self.assertEqual(process.returncode, 0, process.stderr)
             self.assertEqual(json.loads(process.stdout), {"include": [
-                {"example": "examples/esp-idf/01_demo", "idf_version": "v5.5.5", "variant": "default", "sdkconfig_defaults": "", "artifact_name": "firmware-esp-idf-01-demo-v5.5.5-default"},
-                {"example": "examples/esp-idf/01_demo", "idf_version": "v6.0.2", "variant": "default", "sdkconfig_defaults": "", "artifact_name": "firmware-esp-idf-01-demo-v6.0.2-default"},
+                {"example": "examples/esp-idf/01_demo", "idf_version": "v5.5.5", "variant": "default", "sdkconfig_defaults": "../../../config/ci/rev3_x.defaults", "artifact_name": "firmware-esp-idf-01-demo-v5.5.5-default"},
+                {"example": "examples/esp-idf/01_demo", "idf_version": "v6.0.2", "variant": "default", "sdkconfig_defaults": "../../../config/ci/rev3_x.defaults", "artifact_name": "firmware-esp-idf-01-demo-v6.0.2-default"},
             ]})
             values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
             self.assertEqual(values["route"], "examples", values)

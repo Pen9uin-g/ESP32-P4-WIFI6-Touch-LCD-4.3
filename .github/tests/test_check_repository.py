@@ -17,6 +17,22 @@ SPEC.loader.exec_module(checks)
 
 
 class RepositoryCheckTests(unittest.TestCase):
+    def test_required_ci_helpers_fail_closed_when_workflow_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in checks.REQUIRED_CI_HELPERS:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            self.assertEqual(checks.required_ci_helper_errors(root), [])
+
+            missing = ".github/workflows/arduino-examples.yml"
+            (root / missing).unlink()
+            self.assertEqual(
+                checks.required_ci_helper_errors(root),
+                [f"missing CI helper: {missing}"],
+            )
+
     def test_factory_firmware_identity_locks_path_size_and_sha256(self) -> None:
         payload = b"synthetic immutable factory image"
         digest = hashlib.sha256(payload).hexdigest()
@@ -117,6 +133,28 @@ class RepositoryCheckTests(unittest.TestCase):
             "CONFIG_SPIRAM=y\nCONFIG_SPIRAM=n\n", relative
         )
         self.assertEqual(errors, [f"{relative}: repeated sdkconfig assignment CONFIG_SPIRAM"])
+
+    def test_revision_profile_defaults_override_without_conflict(self) -> None:
+        rev3 = (
+            "CONFIG_ESP32P4_REV_MIN_300=y\n"
+            "# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set\n"
+            "CONFIG_SPIRAM=y\n"
+            "CONFIG_SPIRAM_SPEED_250M=y\n"
+            "# CONFIG_SPIRAM_SPEED_200M is not set\n"
+        )
+        rev1 = (
+            "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y\n"
+            "CONFIG_ESP32P4_REV_MIN_100=y\n"
+            "# CONFIG_ESP32P4_REV_MIN_300 is not set\n"
+            "CONFIG_SPIRAM_SPEED_200M=y\n"
+            "# CONFIG_SPIRAM_SPEED_250M is not set\n"
+        )
+        combined = checks.sdkconfig_assignments(f"{rev3}\n{rev1}")
+        self.assertEqual(combined["CONFIG_ESP32P4_SELECTS_REV_LESS_V3"], "y")
+        self.assertEqual(combined["CONFIG_ESP32P4_REV_MIN_100"], "y")
+        self.assertEqual(combined["CONFIG_ESP32P4_REV_MIN_300"], "n")
+        self.assertEqual(combined["CONFIG_SPIRAM_SPEED_200M"], "y")
+        self.assertEqual(combined["CONFIG_SPIRAM_SPEED_250M"], "n")
 
     def test_wifi_password_is_not_logged(self) -> None:
         safe = "ESP_LOGI(TAG, \"connected to SSID:%s\", EXAMPLE_ESP_WIFI_SSID);\n"

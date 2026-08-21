@@ -1,0 +1,107 @@
+name: Arduino examples
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      example:
+        description: "Arduino example name, path, or all"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+env:
+  ARDUINO_CORE_VERSION: "3.3.11"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,UploadMode=default,UploadSpeed=921600"
+
+concurrency:
+  group: arduino-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.examples.outputs.matrix }}
+      count: ${{ steps.examples.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - id: examples
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SELECTOR: ${{ inputs.example || 'all' }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          args=(
+            --core "$ARDUINO_CORE_VERSION"
+            --fqbn "$ARDUINO_FQBN"
+            --github-output "$GITHUB_OUTPUT"
+          )
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            args+=(--selector "$SELECTOR")
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            args+=(--base-ref "$PR_BASE_SHA" --head-ref "$PR_HEAD_SHA")
+          else
+            args+=(--base-ref "$PUSH_BEFORE_SHA" --head-ref "$PUSH_HEAD_SHA")
+          fi
+          python .github/scripts/discover_arduino_examples.py "${args[@]}"
+      - name: Test repository CI helpers
+        run: python .github/tests/run_tests.py
+
+  build:
+    needs: discover
+    if: needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+    name: Build ${{ matrix.name }} (Arduino ${{ matrix.core }})
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install Arduino CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/arduino-cli.tar.gz"
+          install_dir="$RUNNER_TEMP/arduino-cli"
+          wget --https-only --tries=3 --output-document "$archive" \
+            "https://github.com/arduino/arduino-cli/releases/download/v1.5.1/arduino-cli_1.5.1_Linux_64bit.tar.gz"
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" --directory "$install_dir" arduino-cli
+          echo "$install_dir" >> "$GITHUB_PATH"
+      - name: Install ESP32 Arduino core
+        run: |
+          set -euo pipefail
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install "esp32:esp32@${{ matrix.core }}"
+          arduino-cli lib install "GFX Library for Arduino@1.6.7" "lvgl@9.3.0"
+          install -m 0644 examples/arduino/libraries/lv_conf.h "$HOME/Arduino/libraries/lv_conf.h"
+      - name: Compile ${{ matrix.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="${{ matrix.path }}"
+          project_name="$(basename "$project")"
+          test -f "$project/$project_name.ino"
+          arduino-cli compile \
+            --fqbn "${{ matrix.fqbn }}" \
+            --libraries examples/arduino/libraries \
+            --build-path "build/arduino-${{ matrix.name }}" \
+            "$project"
