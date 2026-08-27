@@ -1,4 +1,4 @@
-name: ESP-IDF examples
+name: ESP-IDF examples - ESP32-P4 Rev1.x
 
 on:
   pull_request:
@@ -154,6 +154,7 @@ jobs:
           esp_idf_version: ${{ matrix.idf_version }}
           target: esp32p4
           path: ${{ matrix.example }}
+          command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;../../../config/ci/rev1_3.defaults" build
 
       - name: Build ${{ matrix.variant }} configuration
         if: matrix.sdkconfig_defaults != ''
@@ -162,7 +163,29 @@ jobs:
           esp_idf_version: ${{ matrix.idf_version }}
           target: esp32p4
           path: ${{ matrix.example }}
-          command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;${{ matrix.sdkconfig_defaults }}" build
+          command: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;${{ matrix.sdkconfig_defaults }};../../../config/ci/rev1_3.defaults" build
+
+      - name: Verify ESP32-P4 Rev1.x configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          config_file="${{ matrix.example }}/sdkconfig"
+
+          test -f "$config_file"
+          grep -q '^CONFIG_ESP32P4_REV_MIN_100=y$' "$config_file"
+          grep -q '^CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y$' "$config_file"
+          grep -q '^CONFIG_SPIRAM_SPEED_200M=y$' "$config_file"
+
+          if grep -q '^CONFIG_ESP32P4_REV_MIN_300=y$' "$config_file"; then
+            echo "ERROR: build still targets ESP32-P4 Rev3.x"
+            exit 1
+          fi
+          if grep -q '^CONFIG_SPIRAM_SPEED_250M=y$' "$config_file"; then
+            echo "ERROR: build still uses 250 MHz PSRAM"
+            exit 1
+          fi
+
+          echo "Verified ESP32-P4 Rev1.x with 200 MHz PSRAM"
 
       - name: Package flashable CI artifact
         env:
