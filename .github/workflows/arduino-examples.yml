@@ -1,4 +1,4 @@
-name: Arduino examples
+name: Arduino examples - ESP32-P4 Rev1.x
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ permissions:
 
 env:
   ARDUINO_CORE_VERSION: "3.3.11"
-  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,UploadMode=default,UploadSpeed=921600"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,UploadMode=default,UploadSpeed=921600"
 
 concurrency:
   group: arduino-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -34,6 +34,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
       - id: examples
         shell: bash
         env:
@@ -58,6 +59,7 @@ jobs:
             args+=(--base-ref "$PUSH_BEFORE_SHA" --head-ref "$PUSH_HEAD_SHA")
           fi
           python .github/scripts/discover_arduino_examples.py "${args[@]}"
+
       - name: Test repository CI helpers
         run: python .github/tests/run_tests.py
 
@@ -68,11 +70,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
-    name: Build ${{ matrix.name }} (Arduino ${{ matrix.core }})
+    name: Build ${{ matrix.name }} (Arduino ${{ matrix.core }}, ESP32-P4 Rev1.x)
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
       - name: Install Arduino CLI
         shell: bash
         run: |
@@ -84,6 +87,7 @@ jobs:
           mkdir -p "$install_dir"
           tar -xzf "$archive" --directory "$install_dir" arduino-cli
           echo "$install_dir" >> "$GITHUB_PATH"
+
       - name: Install ESP32 Arduino core
         run: |
           set -euo pipefail
@@ -91,6 +95,25 @@ jobs:
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install "esp32:esp32@${{ matrix.core }}"
+
+      - name: Verify ESP32-P4 Rev1.x FQBN
+        shell: bash
+        run: |
+          set -euo pipefail
+          fqbn="${{ matrix.fqbn }}"
+          case "$fqbn" in
+            *ChipVariant=prev3*) ;;
+            *)
+              echo "ERROR: matrix FQBN does not select ESP32-P4 Before v3.00: $fqbn"
+              exit 1
+              ;;
+          esac
+          if [[ "$fqbn" == *"ChipVariant=postv3"* ]]; then
+            echo "ERROR: matrix FQBN still selects ESP32-P4 v3.00 or newer"
+            exit 1
+          fi
+          echo "Verified Arduino ESP32-P4 Rev1.x FQBN: $fqbn"
+
       - name: Verify bundled Arduino libraries
         shell: bash
         run: |
@@ -102,6 +125,7 @@ jobs:
           test -f examples/arduino/libraries/lvgl/LICENCE.txt
           test -f examples/arduino/libraries/lvgl/src/core/lv_obj.c
           test -f examples/arduino/libraries/lv_conf.h
+
       - name: Compile ${{ matrix.name }}
         shell: bash
         run: |
