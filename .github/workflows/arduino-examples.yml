@@ -149,27 +149,59 @@ jobs:
         run: |
           set -euo pipefail
           git_sha="$(git rev-parse HEAD)"
-          artifact_name="ESP32-P4-WIFI6-Touch-LCD-5-${{ matrix.name }}-arduino-${{ matrix.core }}-rev1"
+          build_path="build/arduino-${{ matrix.name }}"
+          artifact_name="ESP32-P4-WIFI6-Touch-LCD-4.3-${{ matrix.name }}-arduino-${{ matrix.core }}-rev1"
+          package_dir="$RUNNER_TEMP/$artifact_name"
 
-          python3 releases/package_arduino_firmware.py \
-            --project "${{ matrix.path }}" \
-            --build-dir "build/arduino-${{ matrix.name }}" \
-            --name "$artifact_name" \
-            --framework-version "${{ matrix.core }}" \
-            --target esp32p4 \
-            --fqbn "${{ matrix.fqbn }}" \
-            --git-sha "$git_sha" \
-            --output-dir release-artifacts
+          test -f "$build_path/flash_args"
+          mkdir -p "$package_dir" release-artifacts
+          cp -a "$build_path"/. "$package_dir"/
+          sed -E 's#([^[:space:]]*/)([^/[:space:]]+\.bin)#\2#g' \
+            "$build_path/flash_args" > "$package_dir/flash_args"
+          cp "$package_dir/flash_args" "$package_dir/flash_args.txt"
 
-          python3 releases/validate_arduino_firmware.py \
-            --archive "release-artifacts/${artifact_name}-segments.zip" \
-            --project "${{ matrix.path }}" \
-            --build-dir "build/arduino-${{ matrix.name }}" \
-            --name "$artifact_name" \
-            --framework-version "${{ matrix.core }}" \
-            --target esp32p4 \
-            --fqbn "${{ matrix.fqbn }}" \
-            --git-sha "$git_sha"
+          for image in $(tr ' ' '\n' < "$package_dir/flash_args" | sed -n '/\.bin$/p'); do
+            test -f "$package_dir/$image"
+          done
+
+          printf '%s\n' \
+            '@echo off' \
+            'setlocal EnableExtensions EnableDelayedExpansion' \
+            'cd /d "%~dp0"' \
+            'if "%~1"=="" (' \
+            '  echo Usage: flash.bat COMx' \
+            '  exit /b 2' \
+            ')' \
+            'set "FLASH_ARGS="' \
+            'for /f "usebackq delims=" %%A in ("flash_args") do set "FLASH_ARGS=!FLASH_ARGS! %%A"' \
+            'python -m esptool --chip esp32p4 --port "%~1" --baud 921600 write_flash !FLASH_ARGS!' \
+            'exit /b %ERRORLEVEL%' \
+            > "$package_dir/flash.bat"
+
+          printf '%s\n' \
+            '#!/usr/bin/env sh' \
+            'set -eu' \
+            'if [ "$#" -ne 1 ]; then echo "Usage: ./flash.sh PORT"; exit 2; fi' \
+            'cd "$(dirname "$0")"' \
+            'python -m esptool --chip esp32p4 --port "$1" --baud 921600 write_flash $(cat flash_args)' \
+            > "$package_dir/flash.sh"
+          chmod +x "$package_dir/flash.sh"
+
+          printf '%s\n' \
+            "# $artifact_name" \
+            '' \
+            'This package contains the offset-addressed images produced by Arduino CLI.' \
+            'Install esptool with: python -m pip install esptool' \
+            'Windows flashing: flash.bat COM21' \
+            'Linux/macOS flashing: ./flash.sh PORT' \
+            '' \
+            "Git commit: $git_sha" \
+            "FQBN: ${{ matrix.fqbn }}" \
+            > "$package_dir/README.md"
+
+          test -n "$(find "$package_dir" -maxdepth 1 -type f -name '*.bin' -print -quit)"
+          (cd "$RUNNER_TEMP" && zip -qr "$GITHUB_WORKSPACE/release-artifacts/${artifact_name}-segments.zip" "$artifact_name")
+          test -s "release-artifacts/${artifact_name}-segments.zip"
 
           echo "artifact_name=firmware-arduino-${{ matrix.name }}-${{ matrix.core }}-rev1" >> "$GITHUB_OUTPUT"
 
