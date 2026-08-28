@@ -127,14 +127,56 @@ jobs:
           test -f examples/arduino/libraries/lv_conf.h
 
       - name: Compile ${{ matrix.name }}
+        id: compile
         shell: bash
         run: |
           set -euo pipefail
           project="${{ matrix.path }}"
           project_name="$(basename "$project")"
+          build_path="build/arduino-${{ matrix.name }}"
           test -f "$project/$project_name.ino"
           arduino-cli compile \
             --fqbn "${{ matrix.fqbn }}" \
             --libraries examples/arduino/libraries \
-            --build-path "build/arduino-${{ matrix.name }}" \
+            --build-path "$build_path" \
             "$project"
+          test -f "$build_path/flash_args"
+          test -f "$build_path/build.options.json"
+
+      - name: Package Rev1.x firmware
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git_sha="$(git rev-parse HEAD)"
+          artifact_name="ESP32-P4-WIFI6-Touch-LCD-5-${{ matrix.name }}-arduino-${{ matrix.core }}-rev1"
+
+          python3 releases/package_arduino_firmware.py \
+            --project "${{ matrix.path }}" \
+            --build-dir "build/arduino-${{ matrix.name }}" \
+            --name "$artifact_name" \
+            --framework-version "${{ matrix.core }}" \
+            --target esp32p4 \
+            --fqbn "${{ matrix.fqbn }}" \
+            --git-sha "$git_sha" \
+            --output-dir release-artifacts
+
+          python3 releases/validate_arduino_firmware.py \
+            --archive "release-artifacts/${artifact_name}-segments.zip" \
+            --project "${{ matrix.path }}" \
+            --build-dir "build/arduino-${{ matrix.name }}" \
+            --name "$artifact_name" \
+            --framework-version "${{ matrix.core }}" \
+            --target esp32p4 \
+            --fqbn "${{ matrix.fqbn }}" \
+            --git-sha "$git_sha"
+
+          echo "artifact_name=firmware-arduino-${{ matrix.name }}-${{ matrix.core }}-rev1" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Rev1.x firmware artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: release-artifacts/*-segments.zip
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}
